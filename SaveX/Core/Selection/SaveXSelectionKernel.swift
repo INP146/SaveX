@@ -78,6 +78,21 @@ struct FormatSelector {
             return exact
         }
 
+        switch preference {
+        case .preferMP4Direct:
+            let directFormats = formats.filter { !$0.isHLS }
+            if !directFormats.isEmpty {
+                return try selectBest(from: directFormats, preference: .ytDLPCompatible)
+            }
+        case .preferHLS:
+            let hlsFormats = formats.filter(\.isHLS)
+            if !hlsFormats.isEmpty {
+                return try selectBest(from: hlsFormats, preference: .ytDLPCompatible)
+            }
+        case .ytDLPCompatible, .exactFormatID:
+            break
+        }
+
         let policy = FormatSortPolicy(preference: preference)
         return try selectSorted(from: formats, policy: policy).first
             .map(\.format)

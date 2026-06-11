@@ -26,6 +26,7 @@
 		A00100010001000100010012 /* DownloadCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010013 /* DownloadCenter.swift */; };
 		A00100010001000100010013 /* PhotoLibraryWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010014 /* PhotoLibraryWriter.swift */; };
 		A00100010001000100010014 /* LogsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010015 /* LogsView.swift */; };
+		A00100010001000100010015 /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010016 /* LibraryView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -49,6 +50,7 @@
 		A00100010002000100010013 /* DownloadCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadCenter.swift; sourceTree = "<group>"; };
 		A00100010002000100010014 /* PhotoLibraryWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoLibraryWriter.swift; sourceTree = "<group>"; };
 		A00100010002000100010015 /* LogsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogsView.swift; sourceTree = "<group>"; };
+		A00100010002000100010016 /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -108,6 +110,7 @@
 			children = (
 				A00100010004000100010006 /* Home */,
 				A00100010004000100010007 /* Jobs */,
+				A0010001000400010001001D /* Library */,
 				A00100010004000100010008 /* Logs */,
 				A00100010004000100010009 /* Settings */,
 			);
@@ -136,6 +139,14 @@
 				A00100010002000100010015 /* LogsView.swift */,
 			);
 			path = Logs;
+			sourceTree = "<group>";
+		};
+		A0010001000400010001001D /* Library */ = {
+			isa = PBXGroup;
+			children = (
+				A00100010002000100010016 /* LibraryView.swift */,
+			);
+			path = Library;
 			sourceTree = "<group>";
 		};
 		A00100010004000100010009 /* Settings */ = {
@@ -392,6 +403,7 @@
 				A00100010001000100010010 /* SaveXKernelSupport.swift in Sources */,
 				A00100010001000100010013 /* PhotoLibraryWriter.swift in Sources */,
 				A00100010001000100010014 /* LogsView.swift in Sources */,
+				A00100010001000100010015 /* LibraryView.swift in Sources */,
 				A00100010001000100010001 /* SaveXApp.swift in Sources */,
 				A0010001000100010001000C /* SaveXTwitterKernel.swift in Sources */,
 			);

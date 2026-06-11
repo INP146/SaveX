@@ -32,7 +32,7 @@ struct SettingsView: View {
 
                                 SettingRow(title: "Extractor", value: "Twitter/X")
                                 SettingRow(title: "Selector", value: "Best compatible")
-                                SettingRow(title: "Downloader", value: "MP4 first")
+                                SettingRow(title: "Downloader", value: "MP4 + HLS VOD")
                             }
                         }
                     }

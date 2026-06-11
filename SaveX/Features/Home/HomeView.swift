@@ -47,12 +47,17 @@ struct HomeView: View {
                     .padding(14)
                     .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
 
-                Picker("Format", selection: $preferredQuality) {
+                Picker("Download route", selection: $preferredQuality) {
                     ForEach(QualityPreset.allCases) { quality in
-                        Text(quality.rawValue)
+                        Text(quality.label)
+                            .tag(quality)
                     }
                 }
                 .pickerStyle(.segmented)
+
+                Text(preferredQuality.helpText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
 
                 HStack(spacing: 12) {
                     Button {
@@ -108,7 +113,7 @@ struct HomeView: View {
                     Label("Twitter URL parser", systemImage: "link")
                     Label("GraphQL + legacy API config", systemImage: "network")
                     Label("Format selector aligned to yt-dlp", systemImage: "list.number")
-                    Label("MP4 direct download wired, HLS pending", systemImage: "arrow.down.circle")
+                    Label("MP4 direct and basic HLS download wired", systemImage: "arrow.down.circle")
                     Label(downloadCenter.hasJobs ? "Jobs list synced with live kernel state" : "Queue a public tweet to start the local kernel", systemImage: "sparkle.magnifyingglass")
                 }
                 .font(.subheadline)
@@ -176,12 +181,34 @@ private struct MetricTile: View {
 }
 
 private enum QualityPreset: String, CaseIterable, Identifiable {
-    case best = "Best"
-    case mp4 = "MP4"
-    case hls = "HLS"
+    case best
+    case mp4
+    case hls
 
     var id: String {
         rawValue
+    }
+
+    var label: String {
+        switch self {
+        case .best:
+            return "Auto"
+        case .mp4:
+            return "MP4 File"
+        case .hls:
+            return "HLS Stream"
+        }
+    }
+
+    var helpText: String {
+        switch self {
+        case .best:
+            return "Automatically picks the best compatible download route."
+        case .mp4:
+            return "Prefers a single MP4 file when Twitter/X exposes one."
+        case .hls:
+            return "Prefers the streamed playlist route when available."
+        }
     }
 
     var selectionPreference: FormatSelectionPreference {

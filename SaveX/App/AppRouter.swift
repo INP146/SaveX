@@ -21,6 +21,11 @@ struct AppRouter: View {
                     Label("Jobs", systemImage: "arrow.down.circle")
                 }
 
+            LibraryView(downloadCenter: downloadCenter)
+                .tabItem {
+                    Label("Library", systemImage: "books.vertical.fill")
+                }
+
             LogsView(downloadCenter: downloadCenter)
                 .tabItem {
                     Label("Logs", systemImage: "list.bullet.rectangle")

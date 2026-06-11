@@ -47,11 +47,28 @@ struct DownloadBanner: Sendable {
     let kind: Kind
 }
 
+struct LocalLibraryItem: Identifiable, Codable, Sendable, Equatable {
+    let id: UUID
+    let createdAt: Date
+    let sourceTweetID: String
+    let sourceURLString: String
+    let title: String
+    let formatID: String
+    let fileName: String
+    let fileSize: Int64
+    let responseMimeType: String?
+
+    var sourceURL: URL? {
+        URL(string: sourceURLString)
+    }
+}
+
 @MainActor
 final class DownloadCenter: ObservableObject {
     @Published private(set) var jobs: [DownloadJob]
     @Published private(set) var banner: DownloadBanner
     @Published private(set) var logs: [DownloadLogEntry]
+    @Published private(set) var libraryItems: [LocalLibraryItem]
 
     private let container: AppContainer
     private let fileManager: FileManager
@@ -61,6 +78,8 @@ final class DownloadCenter: ObservableObject {
         jobs: [DownloadJob] = [],
         banner: DownloadBanner = DownloadBanner(text: "Local kernel ready", kind: .info),
         logs: [DownloadLogEntry] = [],
+        libraryItems: [LocalLibraryItem] = [],
+        loadPersistedLibrary: Bool = true,
         fileManager: FileManager = .default
     ) {
         self.container = container
@@ -68,6 +87,9 @@ final class DownloadCenter: ObservableObject {
         self.banner = banner
         self.logs = logs
         self.fileManager = fileManager
+        self.libraryItems = loadPersistedLibrary
+            ? Self.loadLibraryItems(fileManager: fileManager)
+            : libraryItems
     }
 
     var activeCount: Int {
@@ -75,12 +97,12 @@ final class DownloadCenter: ObservableObject {
     }
 
     var completedCount: Int {
-        jobs.filter { $0.phase == .completed }.count
+        libraryItems.count
     }
 
     var savedBytes: Int64 {
-        jobs.reduce(into: Int64.zero) { partialResult, job in
-            partialResult += job.savedFileSize ?? 0
+        libraryItems.reduce(into: Int64.zero) { partialResult, item in
+            partialResult += item.fileSize
         }
     }
 
@@ -183,6 +205,7 @@ final class DownloadCenter: ObservableObject {
                 job.savedFileSize = asset.fileSize
                 job.errorMessage = nil
             }
+            recordLibraryItem(asset: asset, request: request)
             do {
                 try await container.photoLibraryWriter.saveVideoToLibrary(at: asset.localFileURL)
                 banner = DownloadBanner(text: "Saved \(asset.localFileURL.lastPathComponent) to Photos", kind: .success)
@@ -231,6 +254,30 @@ final class DownloadCenter: ObservableObject {
         logs.removeAll()
     }
 
+    func fileURL(for item: LocalLibraryItem) -> URL {
+        downloadsDirectory.appendingPathComponent(item.fileName, isDirectory: false)
+    }
+
+    func deleteLibraryItem(_ item: LocalLibraryItem) {
+        let url = fileURL(for: item)
+        do {
+            if fileManager.fileExists(atPath: url.path) {
+                try fileManager.removeItem(at: url)
+            }
+            libraryItems.removeAll { $0.id == item.id }
+            persistLibraryItems()
+            banner = DownloadBanner(text: "Deleted \(item.fileName)", kind: .info)
+            appendLog(kind: .info, title: "Deleted local file", message: item.fileName, tweetID: item.sourceTweetID)
+        } catch {
+            banner = DownloadBanner(text: "Delete failed: \(error.localizedDescription)", kind: .error)
+            appendLog(kind: .error, title: "Delete failed", message: error.localizedDescription, tweetID: item.sourceTweetID)
+        }
+    }
+
+    func reloadLibrary() {
+        libraryItems = Self.loadLibraryItems(fileManager: fileManager)
+    }
+
     private func appendLog(
         kind: DownloadLogEntry.Kind,
         title: String,
@@ -253,12 +300,79 @@ final class DownloadCenter: ObservableObject {
         }
     }
 
+    private func recordLibraryItem(asset: DownloadedAsset, request: TweetRequest) {
+        let item = LocalLibraryItem(
+            id: UUID(),
+            createdAt: Date(),
+            sourceTweetID: request.tweetID,
+            sourceURLString: request.sourceURL.absoluteString,
+            title: asset.localFileURL.deletingPathExtension().lastPathComponent,
+            formatID: asset.format.formatID,
+            fileName: asset.localFileURL.lastPathComponent,
+            fileSize: asset.fileSize,
+            responseMimeType: asset.responseMimeType
+        )
+
+        libraryItems.removeAll { $0.fileName == item.fileName }
+        libraryItems.insert(item, at: 0)
+        persistLibraryItems()
+    }
+
+    private func persistLibraryItems() {
+        do {
+            try fileManager.createDirectory(at: libraryDirectory, withIntermediateDirectories: true)
+            let data = try JSONEncoder.saveXLibraryEncoder.encode(libraryItems)
+            try data.write(to: libraryManifestURL, options: .atomic)
+        } catch {
+            appendLog(kind: .warning, title: "Library save failed", message: error.localizedDescription, tweetID: nil)
+        }
+    }
+
+    private static func loadLibraryItems(fileManager: FileManager) -> [LocalLibraryItem] {
+        let manifestURL = libraryManifestURL(fileManager: fileManager)
+        guard let data = try? Data(contentsOf: manifestURL),
+              let items = try? JSONDecoder.saveXLibraryDecoder.decode([LocalLibraryItem].self, from: data) else {
+            return []
+        }
+
+        let downloads = downloadsDirectory(fileManager: fileManager)
+        return items.filter { item in
+            fileManager.fileExists(atPath: downloads.appendingPathComponent(item.fileName).path)
+        }
+    }
+
     private var downloadsDirectory: URL {
+        Self.downloadsDirectory(fileManager: fileManager)
+    }
+
+    private var libraryDirectory: URL {
+        Self.libraryDirectory(fileManager: fileManager)
+    }
+
+    private var libraryManifestURL: URL {
+        Self.libraryManifestURL(fileManager: fileManager)
+    }
+
+    private static func downloadsDirectory(fileManager: FileManager) -> URL {
+        documentsDirectory(fileManager: fileManager)
+            .appendingPathComponent("SaveX", isDirectory: true)
+            .appendingPathComponent("Downloads", isDirectory: true)
+    }
+
+    private static func libraryDirectory(fileManager: FileManager) -> URL {
+        documentsDirectory(fileManager: fileManager)
+            .appendingPathComponent("SaveX", isDirectory: true)
+    }
+
+    private static func documentsDirectory(fileManager: FileManager) -> URL {
         let documents = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first
             ?? fileManager.temporaryDirectory
         return documents
-            .appendingPathComponent("SaveX", isDirectory: true)
-            .appendingPathComponent("Downloads", isDirectory: true)
+    }
+
+    private static func libraryManifestURL(fileManager: FileManager) -> URL {
+        libraryDirectory(fileManager: fileManager)
+            .appendingPathComponent("library.json", isDirectory: false)
     }
 }
 
@@ -373,7 +487,38 @@ extension DownloadCenter {
                     message: "syndication returned tweet payload",
                     tweetID: "1577855540407197696"
                 ),
-            ]
+            ],
+            libraryItems: [
+                LocalLibraryItem(
+                    id: UUID(),
+                    createdAt: Date(),
+                    sourceTweetID: "1577855540407197696",
+                    sourceURLString: "https://twitter.com/oshtru/status/1577855540407197696",
+                    title: "Oshtru-now-I-can-post-image-and-video-nice-update-3",
+                    formatID: "http-2176000",
+                    fileName: "Oshtru-now-I-can-post-image-and-video-nice-update-3.mp4",
+                    fileSize: 1_787_622,
+                    responseMimeType: "video/mp4"
+                ),
+            ],
+            loadPersistedLibrary: false
         )
+    }
+}
+
+private extension JSONEncoder {
+    static var saveXLibraryEncoder: JSONEncoder {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        return encoder
+    }
+}
+
+private extension JSONDecoder {
+    static var saveXLibraryDecoder: JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return decoder
     }
 }
