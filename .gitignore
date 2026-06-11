@@ -1,0 +1,6 @@
+# Ignore yt-dlp snapshots and generated artifacts.
+yt-dlp-*/
+yt-dlp/
+
+# macOS metadata
+.DS_Store
