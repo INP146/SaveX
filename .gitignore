@@ -2,5 +2,8 @@
 yt-dlp-*/
 yt-dlp/
 
+# Local build and release artifacts.
+build/
+
 # macOS metadata
 .DS_Store
