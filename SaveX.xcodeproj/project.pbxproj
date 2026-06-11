@@ -1,9 +1,9 @@
 // !$*UTF8*$!
 {
-	objectVersion = 77;
 	archiveVersion = 1;
 	classes = {
 	};
+	objectVersion = 77;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -12,6 +12,20 @@
 		A00100010001000100010003 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010003 /* Assets.xcassets */; };
 		A00100010001000100010004 /* AppContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010005 /* AppContainer.swift */; };
 		A00100010001000100010005 /* AppRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010006 /* AppRouter.swift */; };
+		A00100010001000100010006 /* JobsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010007 /* JobsView.swift */; };
+		A00100010001000100010008 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010009 /* SettingsView.swift */; };
+		A00100010001000100010009 /* GlassPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0010001000200010001000A /* GlassPanel.swift */; };
+		A0010001000100010001000A /* SaveXBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0010001000200010001000B /* SaveXBackground.swift */; };
+		A0010001000100010001000B /* StatusPill.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0010001000200010001000C /* StatusPill.swift */; };
+		A0010001000100010001000C /* SaveXTwitterKernel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0010001000200010001000D /* SaveXTwitterKernel.swift */; };
+		A0010001000100010001000D /* SaveXExtractionKernel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0010001000200010001000E /* SaveXExtractionKernel.swift */; };
+		A0010001000100010001000E /* SaveXSelectionKernel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0010001000200010001000F /* SaveXSelectionKernel.swift */; };
+		A0010001000100010001000F /* SaveXKernelModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010010 /* SaveXKernelModels.swift */; };
+		A00100010001000100010010 /* SaveXKernelSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010011 /* SaveXKernelSupport.swift */; };
+		A00100010001000100010011 /* SaveXDownloadKernel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010012 /* SaveXDownloadKernel.swift */; };
+		A00100010001000100010012 /* DownloadCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010013 /* DownloadCenter.swift */; };
+		A00100010001000100010013 /* PhotoLibraryWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010014 /* PhotoLibraryWriter.swift */; };
+		A00100010001000100010014 /* LogsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010015 /* LogsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -21,6 +35,20 @@
 		A00100010002000100010004 /* SaveX.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SaveX.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A00100010002000100010005 /* AppContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppContainer.swift; sourceTree = "<group>"; };
 		A00100010002000100010006 /* AppRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRouter.swift; sourceTree = "<group>"; };
+		A00100010002000100010007 /* JobsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JobsView.swift; sourceTree = "<group>"; };
+		A00100010002000100010009 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		A0010001000200010001000A /* GlassPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassPanel.swift; sourceTree = "<group>"; };
+		A0010001000200010001000B /* SaveXBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveXBackground.swift; sourceTree = "<group>"; };
+		A0010001000200010001000C /* StatusPill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusPill.swift; sourceTree = "<group>"; };
+		A0010001000200010001000D /* SaveXTwitterKernel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveXTwitterKernel.swift; sourceTree = "<group>"; };
+		A0010001000200010001000E /* SaveXExtractionKernel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveXExtractionKernel.swift; sourceTree = "<group>"; };
+		A0010001000200010001000F /* SaveXSelectionKernel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveXSelectionKernel.swift; sourceTree = "<group>"; };
+		A00100010002000100010010 /* SaveXKernelModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveXKernelModels.swift; sourceTree = "<group>"; };
+		A00100010002000100010011 /* SaveXKernelSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveXKernelSupport.swift; sourceTree = "<group>"; };
+		A00100010002000100010012 /* SaveXDownloadKernel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveXDownloadKernel.swift; sourceTree = "<group>"; };
+		A00100010002000100010013 /* DownloadCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadCenter.swift; sourceTree = "<group>"; };
+		A00100010002000100010014 /* PhotoLibraryWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoLibraryWriter.swift; sourceTree = "<group>"; };
+		A00100010002000100010015 /* LogsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -68,6 +96,7 @@
 			isa = PBXGroup;
 			children = (
 				A00100010002000100010005 /* AppContainer.swift */,
+				A00100010002000100010013 /* DownloadCenter.swift */,
 				A00100010002000100010006 /* AppRouter.swift */,
 				A00100010002000100010001 /* SaveXApp.swift */,
 			);
@@ -79,7 +108,7 @@
 			children = (
 				A00100010004000100010006 /* Home */,
 				A00100010004000100010007 /* Jobs */,
-				A00100010004000100010008 /* Library */,
+				A00100010004000100010008 /* Logs */,
 				A00100010004000100010009 /* Settings */,
 			);
 			path = Features;
@@ -96,20 +125,23 @@
 		A00100010004000100010007 /* Jobs */ = {
 			isa = PBXGroup;
 			children = (
+				A00100010002000100010007 /* JobsView.swift */,
 			);
 			path = Jobs;
 			sourceTree = "<group>";
 		};
-		A00100010004000100010008 /* Library */ = {
+		A00100010004000100010008 /* Logs */ = {
 			isa = PBXGroup;
 			children = (
+				A00100010002000100010015 /* LogsView.swift */,
 			);
-			path = Library;
+			path = Logs;
 			sourceTree = "<group>";
 		};
 		A00100010004000100010009 /* Settings */ = {
 			isa = PBXGroup;
 			children = (
+				A00100010002000100010009 /* SettingsView.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -130,6 +162,7 @@
 		A0010001000400010001000B /* Twitter */ = {
 			isa = PBXGroup;
 			children = (
+				A0010001000200010001000D /* SaveXTwitterKernel.swift */,
 			);
 			path = Twitter;
 			sourceTree = "<group>";
@@ -137,6 +170,7 @@
 		A0010001000400010001000C /* Extraction */ = {
 			isa = PBXGroup;
 			children = (
+				A0010001000200010001000E /* SaveXExtractionKernel.swift */,
 			);
 			path = Extraction;
 			sourceTree = "<group>";
@@ -144,6 +178,7 @@
 		A0010001000400010001000D /* Selection */ = {
 			isa = PBXGroup;
 			children = (
+				A0010001000200010001000F /* SaveXSelectionKernel.swift */,
 			);
 			path = Selection;
 			sourceTree = "<group>";
@@ -151,6 +186,7 @@
 		A0010001000400010001000E /* Download */ = {
 			isa = PBXGroup;
 			children = (
+				A00100010002000100010012 /* SaveXDownloadKernel.swift */,
 			);
 			path = Download;
 			sourceTree = "<group>";
@@ -158,6 +194,7 @@
 		A0010001000400010001000F /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				A00100010002000100010010 /* SaveXKernelModels.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -165,6 +202,7 @@
 		A00100010004000100010010 /* Support */ = {
 			isa = PBXGroup;
 			children = (
+				A00100010002000100010011 /* SaveXKernelSupport.swift */,
 			);
 			path = Support;
 			sourceTree = "<group>";
@@ -213,6 +251,7 @@
 		A00100010004000100010016 /* Storage */ = {
 			isa = PBXGroup;
 			children = (
+				A00100010002000100010014 /* PhotoLibraryWriter.swift */,
 			);
 			path = Storage;
 			sourceTree = "<group>";
@@ -244,6 +283,9 @@
 		A0010001000400010001001A /* UI */ = {
 			isa = PBXGroup;
 			children = (
+				A0010001000200010001000A /* GlassPanel.swift */,
+				A0010001000200010001000B /* SaveXBackground.swift */,
+				A0010001000200010001000C /* StatusPill.swift */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -276,8 +318,6 @@
 			buildRules = (
 			);
 			dependencies = (
-			);
-			fileSystemSynchronizedGroups = (
 			);
 			name = SaveX;
 			packageProductDependencies = (
@@ -338,8 +378,22 @@
 			files = (
 				A00100010001000100010005 /* AppRouter.swift in Sources */,
 				A00100010001000100010004 /* AppContainer.swift in Sources */,
+				A00100010001000100010012 /* DownloadCenter.swift in Sources */,
+				A00100010001000100010009 /* GlassPanel.swift in Sources */,
+				A0010001000100010001000A /* SaveXBackground.swift in Sources */,
+				A0010001000100010001000D /* SaveXExtractionKernel.swift in Sources */,
+				A00100010001000100010011 /* SaveXDownloadKernel.swift in Sources */,
+				A0010001000100010001000F /* SaveXKernelModels.swift in Sources */,
 				A00100010001000100010002 /* HomeView.swift in Sources */,
+				A0010001000100010001000B /* StatusPill.swift in Sources */,
+				A00100010001000100010006 /* JobsView.swift in Sources */,
+				A0010001000100010001000E /* SaveXSelectionKernel.swift in Sources */,
+				A00100010001000100010008 /* SettingsView.swift in Sources */,
+				A00100010001000100010010 /* SaveXKernelSupport.swift in Sources */,
+				A00100010001000100010013 /* PhotoLibraryWriter.swift in Sources */,
+				A00100010001000100010014 /* LogsView.swift in Sources */,
 				A00100010001000100010001 /* SaveXApp.swift in Sources */,
+				A0010001000100010001000C /* SaveXTwitterKernel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -410,16 +464,17 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"SaveX/Preview Content\"";
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 4KZR8B23CV;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = SaveX;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "SaveX needs permission to add downloaded videos to your photo library.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -441,16 +496,17 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"SaveX/Preview Content\"";
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 4KZR8B23CV;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = SaveX;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "SaveX needs permission to add downloaded videos to your photo library.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
