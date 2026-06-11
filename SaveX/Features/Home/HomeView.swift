@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct ContentView: View {
+struct HomeView: View {
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 20) {
@@ -12,9 +12,9 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
 
                 VStack(alignment: .leading, spacing: 12) {
-                    Label("SwiftUI scaffold created", systemImage: "checkmark.circle.fill")
-                    Label("Bundle ID: com.savex", systemImage: "shippingbox.fill")
-                    Label("Deployment target: iOS 26.0", systemImage: "iphone")
+                    Label("Architecture scaffold created", systemImage: "checkmark.circle.fill")
+                    Label("Home feature moved to Features/Home", systemImage: "square.stack.3d.up.fill")
+                    Label("App entry moved to App/", systemImage: "shippingbox.fill")
                 }
                 .font(.body)
                 .symbolRenderingMode(.hierarchical)
@@ -28,5 +28,5 @@ struct ContentView: View {
 }
 
 #Preview {
-    ContentView()
+    HomeView()
 }

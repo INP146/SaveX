@@ -8,15 +8,19 @@
 
 /* Begin PBXBuildFile section */
 		A00100010001000100010001 /* SaveXApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010001 /* SaveXApp.swift */; };
-		A00100010001000100010002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010002 /* ContentView.swift */; };
+		A00100010001000100010002 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010002 /* HomeView.swift */; };
 		A00100010001000100010003 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010003 /* Assets.xcassets */; };
+		A00100010001000100010004 /* AppContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010005 /* AppContainer.swift */; };
+		A00100010001000100010005 /* AppRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010006 /* AppRouter.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		A00100010002000100010001 /* SaveXApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveXApp.swift; sourceTree = "<group>"; };
-		A00100010002000100010002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		A00100010002000100010002 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		A00100010002000100010003 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A00100010002000100010004 /* SaveX.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SaveX.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A00100010002000100010005 /* AppContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppContainer.swift; sourceTree = "<group>"; };
+		A00100010002000100010006 /* AppRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRouter.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -41,8 +45,12 @@
 		A00100010004000100010002 /* SaveX */ = {
 			isa = PBXGroup;
 			children = (
-				A00100010002000100010001 /* SaveXApp.swift */,
-				A00100010002000100010002 /* ContentView.swift */,
+				A00100010004000100010004 /* App */,
+				A00100010004000100010005 /* Features */,
+				A0010001000400010001000A /* Core */,
+				A00100010004000100010011 /* Data */,
+				A00100010004000100010014 /* Infrastructure */,
+				A00100010004000100010019 /* Shared */,
 				A00100010002000100010003 /* Assets.xcassets */,
 			);
 			path = SaveX;
@@ -54,6 +62,204 @@
 				A00100010002000100010004 /* SaveX.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		A00100010004000100010004 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				A00100010002000100010005 /* AppContainer.swift */,
+				A00100010002000100010006 /* AppRouter.swift */,
+				A00100010002000100010001 /* SaveXApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		A00100010004000100010005 /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				A00100010004000100010006 /* Home */,
+				A00100010004000100010007 /* Jobs */,
+				A00100010004000100010008 /* Library */,
+				A00100010004000100010009 /* Settings */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		A00100010004000100010006 /* Home */ = {
+			isa = PBXGroup;
+			children = (
+				A00100010002000100010002 /* HomeView.swift */,
+			);
+			path = Home;
+			sourceTree = "<group>";
+		};
+		A00100010004000100010007 /* Jobs */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Jobs;
+			sourceTree = "<group>";
+		};
+		A00100010004000100010008 /* Library */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Library;
+			sourceTree = "<group>";
+		};
+		A00100010004000100010009 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		A0010001000400010001000A /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				A0010001000400010001000B /* Twitter */,
+				A0010001000400010001000C /* Extraction */,
+				A0010001000400010001000D /* Selection */,
+				A0010001000400010001000E /* Download */,
+				A0010001000400010001000F /* Models */,
+				A00100010004000100010010 /* Support */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		A0010001000400010001000B /* Twitter */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Twitter;
+			sourceTree = "<group>";
+		};
+		A0010001000400010001000C /* Extraction */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Extraction;
+			sourceTree = "<group>";
+		};
+		A0010001000400010001000D /* Selection */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Selection;
+			sourceTree = "<group>";
+		};
+		A0010001000400010001000E /* Download */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Download;
+			sourceTree = "<group>";
+		};
+		A0010001000400010001000F /* Models */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		A00100010004000100010010 /* Support */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Support;
+			sourceTree = "<group>";
+		};
+		A00100010004000100010011 /* Data */ = {
+			isa = PBXGroup;
+			children = (
+				A00100010004000100010012 /* Repositories */,
+				A00100010004000100010013 /* Persistence */,
+			);
+			path = Data;
+			sourceTree = "<group>";
+		};
+		A00100010004000100010012 /* Repositories */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Repositories;
+			sourceTree = "<group>";
+		};
+		A00100010004000100010013 /* Persistence */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Persistence;
+			sourceTree = "<group>";
+		};
+		A00100010004000100010014 /* Infrastructure */ = {
+			isa = PBXGroup;
+			children = (
+				A00100010004000100010015 /* Networking */,
+				A00100010004000100010016 /* Storage */,
+				A00100010004000100010017 /* System */,
+				A00100010004000100010018 /* Logging */,
+			);
+			path = Infrastructure;
+			sourceTree = "<group>";
+		};
+		A00100010004000100010015 /* Networking */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Networking;
+			sourceTree = "<group>";
+		};
+		A00100010004000100010016 /* Storage */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Storage;
+			sourceTree = "<group>";
+		};
+		A00100010004000100010017 /* System */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = System;
+			sourceTree = "<group>";
+		};
+		A00100010004000100010018 /* Logging */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Logging;
+			sourceTree = "<group>";
+		};
+		A00100010004000100010019 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				A0010001000400010001001A /* UI */,
+				A0010001000400010001001B /* Components */,
+				A0010001000400010001001C /* Extensions */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		A0010001000400010001001A /* UI */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = UI;
+			sourceTree = "<group>";
+		};
+		A0010001000400010001001B /* Components */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
+		A0010001000400010001001C /* Extensions */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Extensions;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -130,7 +336,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A00100010001000100010002 /* ContentView.swift in Sources */,
+				A00100010001000100010005 /* AppRouter.swift in Sources */,
+				A00100010001000100010004 /* AppContainer.swift in Sources */,
+				A00100010001000100010002 /* HomeView.swift in Sources */,
 				A00100010001000100010001 /* SaveXApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
