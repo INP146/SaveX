@@ -2,7 +2,7 @@
 
 <img src="docs/design/savex-iOS-Default-1024x1024@1x.png" alt="SaveX app icon" width="140" />
 
-<h1 align="center">SaveX</h1>
+<h1 align="center">SaveX - Twitter Video Downloader</h1>
 
 <p><a href="README.zh-CN.md">🇨🇳 简体中文</a></p>
 
@@ -13,6 +13,15 @@
   <img src="https://img.shields.io/badge/Swift-5.0%2B-F05138?logo=swift&logoColor=white" alt="Swift 5.0+" />
   <img src="https://img.shields.io/badge/SwiftUI-native-0D96F6?logo=swift&logoColor=white" alt="SwiftUI native" />
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT" /></a>
+</p>
+
+<p>
+  <a href="https://altstore.io/source/INP146.github.io/AltSource/source.json?app=com.savex">
+    <img src="docs/badges/DownloadBadge_dark.png" alt="Download on AltStore" height="45" />
+  </a>
+  <a href="sidestore://source?url=https%3A%2F%2FINP146.github.io%2FAltSource%2Fsource.json">
+    <img src="docs/badges/add-source-to-sidestore.png" alt="Add Source to SideStore" height="45" />
+  </a>
 </p>
 
 </div>
