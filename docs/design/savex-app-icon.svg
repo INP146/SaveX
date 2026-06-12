@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title>SaveX App Icon</title>
+  <desc>A flat white app icon with a black folder and the official-style white X mark.</desc>
+  <rect width="1024" height="1024" fill="#FFFFFF"/>
+
+  <g fill="#0B0B0F">
+    <path d="M162 318c0-46 38-84 84-84h192c29 0 56 15 72 40l38 58h230c46 0 84 38 84 84v304c0 54-44 98-98 98H260c-54 0-98-44-98-98V318Z"/>
+    <path d="M162 414h700v306c0 54-44 98-98 98H260c-54 0-98-44-98-98V414Z"/>
+  </g>
+
+  <g fill="#FFFFFF" transform="translate(370 451) scale(0.55)">
+    <path d="M389.2 48h70.6L305.6 224.2 487 464H345L233.7 318.6 106.5 464H35.8l167.1-190.9L29 48h145.5l100.5 132.9L389.2 48zm-24.8 373.8h39.1L151.3 88h-42l255.1 333.8z"/>
+  </g>
+</svg>
