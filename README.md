@@ -33,12 +33,9 @@ If the requested route is not available, SaveX falls back to the best available 
 
 ## Output Notes
 
-In the current implementation:
-
 - Direct MP4 downloads are saved as `.mp4`
-- HLS VOD downloads are downloaded and concatenated segment by segment, and are currently saved as `.ts`
-
-This means `HLS Stream` is not yet a full MP4 remux workflow. A future remux or export step is needed before the HLS route can consistently produce `.mp4` files.
+- HLS VOD downloads are assembled segment by segment, then exported to `.mp4` with AVFoundation
+- If an HLS stream cannot be exported to MP4 by the native iOS media stack, the download fails instead of keeping a `.ts` fallback file
 
 ## Known Limitations
 

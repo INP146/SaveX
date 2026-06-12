@@ -33,12 +33,9 @@ SaveX 的 Twitter/X 解析、格式提取和格式排序思路参考了 [yt-dlp]
 
 ## 输出说明
 
-当前实现中：
-
 - MP4 直链会保存为 `.mp4`
-- HLS VOD 会下载并按顺序拼接 segment，当前保存为 `.ts`
-
-也就是说，`HLS Stream` 目前不是完整的 MP4 remux 流程。后续需要接入 remux 或导出流程，才能把 HLS 路线统一落成 `.mp4`。
+- HLS VOD 会下载并按顺序拼接 segment，然后通过 AVFoundation 导出为 `.mp4`
+- 如果某条 HLS 流无法被 iOS 原生媒体栈导出为 MP4，任务会失败，不保留 `.ts` 兜底文件
 
 ## 已知限制
 

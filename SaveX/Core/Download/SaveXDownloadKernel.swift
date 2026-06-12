@@ -1,4 +1,5 @@
 import Foundation
+@preconcurrency import AVFoundation
 
 enum DownloadExecutionPlan: Sendable {
     case singleFile(MediaFormat)
@@ -22,6 +23,36 @@ struct DownloadPlanner {
             throw SaveXError.notImplemented("Unsupported transport: \(format.transport.rawValue)")
         }
         return .singleFile(format)
+    }
+}
+
+protocol HLSMediaExporting: Sendable {
+    func exportMP4(from sourceURL: URL, to destinationURL: URL) async throws
+}
+
+struct AVFoundationHLSMediaExporter: HLSMediaExporting {
+    func exportMP4(from sourceURL: URL, to destinationURL: URL) async throws {
+        let asset = AVURLAsset(url: sourceURL)
+        guard let exportSession = AVAssetExportSession(
+            asset: asset,
+            presetName: AVAssetExportPresetPassthrough
+        ) else {
+            throw SaveXError.hlsExportFailed("AVFoundation could not create a passthrough export session")
+        }
+        guard exportSession.supportedFileTypes.contains(.mp4) else {
+            throw SaveXError.hlsExportFailed("AVFoundation does not support MP4 export for this HLS media")
+        }
+
+        exportSession.outputURL = destinationURL
+        exportSession.outputFileType = .mp4
+        exportSession.shouldOptimizeForNetworkUse = true
+
+        do {
+            try await exportSession.export(to: destinationURL, as: .mp4)
+        } catch {
+            let reason = error.localizedDescription
+            throw SaveXError.hlsExportFailed(reason)
+        }
     }
 }
 
@@ -280,15 +311,18 @@ actor HLSManifestLoader {
 actor HLSMediaDownloader {
     private let session: URLSession
     private let manifestLoader: HLSManifestLoader
+    private let exporter: any HLSMediaExporting
     private let fileManager: FileManager
 
     init(
         session: URLSession = .shared,
         manifestLoader: HLSManifestLoader? = nil,
+        exporter: any HLSMediaExporting = AVFoundationHLSMediaExporter(),
         fileManager: FileManager = .default
     ) {
         self.session = session
         self.manifestLoader = manifestLoader ?? HLSManifestLoader(session: session)
+        self.exporter = exporter
         self.fileManager = fileManager
     }
 
@@ -296,7 +330,8 @@ actor HLSMediaDownloader {
         format: MediaFormat,
         tweetID: String,
         title: String,
-        destinationDirectory: URL
+        destinationDirectory: URL,
+        onTraceEvent: (@Sendable (DownloadTraceEvent) async -> Void)? = nil
     ) async throws -> DownloadedAsset {
         try ensureDirectoryExists(destinationDirectory)
 
@@ -306,11 +341,7 @@ actor HLSMediaDownloader {
             headers: format.httpHeaders
         )
 
-        let destinationURL = uniqueDestinationURL(
-            in: destinationDirectory,
-            baseName: makeFilename(tweetID: tweetID, title: title),
-            ext: "ts"
-        )
+        let baseName = makeFilename(tweetID: tweetID, title: title)
         let workingDirectory = destinationDirectory
             .appendingPathComponent(".savex-hls-\(UUID().uuidString)", isDirectory: true)
         try ensureDirectoryExists(workingDirectory)
@@ -318,8 +349,10 @@ actor HLSMediaDownloader {
             try? fileManager.removeItem(at: workingDirectory)
         }
 
-        fileManager.createFile(atPath: destinationURL.path, contents: nil)
-        let outputHandle = try FileHandle(forWritingTo: destinationURL)
+        await onTraceEvent?(.init(kind: .info, message: "Assembling HLS segments"))
+        let assembledURL = workingDirectory.appendingPathComponent("\(baseName).ts", isDirectory: false)
+        fileManager.createFile(atPath: assembledURL.path, contents: nil)
+        let outputHandle = try FileHandle(forWritingTo: assembledURL)
         defer {
             try? outputHandle.close()
         }
@@ -334,6 +367,21 @@ actor HLSMediaDownloader {
             try outputHandle.write(contentsOf: data)
         }
 
+        let destinationURL = uniqueDestinationURL(
+            in: destinationDirectory,
+            baseName: baseName,
+            ext: "mp4"
+        )
+        await onTraceEvent?(.init(kind: .info, message: "Exporting HLS media to MP4"))
+        do {
+            try await exporter.exportMP4(from: assembledURL, to: destinationURL)
+        } catch {
+            if fileManager.fileExists(atPath: destinationURL.path) {
+                try? fileManager.removeItem(at: destinationURL)
+            }
+            throw error
+        }
+
         let attributes = try fileManager.attributesOfItem(atPath: destinationURL.path)
         let fileSize = (attributes[.size] as? NSNumber)?.int64Value ?? 0
         return DownloadedAsset(
@@ -341,7 +389,7 @@ actor HLSMediaDownloader {
             format: format,
             localFileURL: destinationURL,
             fileSize: fileSize,
-            responseMimeType: "video/MP2T"
+            responseMimeType: "video/mp4"
         )
     }
 
@@ -577,7 +625,8 @@ actor DownloadEngine {
                 format: format,
                 tweetID: request.tweetID,
                 title: entry.title,
-                destinationDirectory: destinationDirectory
+                destinationDirectory: destinationDirectory,
+                onTraceEvent: onTraceEvent
             )
         }
     }

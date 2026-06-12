@@ -31,6 +31,7 @@ enum SaveXError: LocalizedError, Sendable {
     case mediaNotVideo(index: Int)
     case unsupportedCard(String)
     case unsupportedHLS(String)
+    case hlsExportFailed(String)
     case xmlParseFailed(String)
     case notImplemented(String)
     case photoLibraryAccessDenied
@@ -65,6 +66,8 @@ enum SaveXError: LocalizedError, Sendable {
             return "Unsupported Twitter card: \(name)"
         case let .unsupportedHLS(reason):
             return "Unsupported HLS playlist: \(reason)"
+        case let .hlsExportFailed(reason):
+            return "HLS MP4 export failed: \(reason)"
         case let .xmlParseFailed(reason):
             return "VMAP parse failed: \(reason)"
         case let .notImplemented(reason):

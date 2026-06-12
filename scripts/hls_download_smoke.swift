@@ -55,6 +55,7 @@ struct HLSDownloadSmokeMain {
     static func main() async {
         do {
             try await testHLSDownload()
+            try await testHLSExportFailure()
             print("hls download smoke passed")
         } catch {
             print("FAILED: \(error.localizedDescription)")
@@ -99,7 +100,8 @@ struct HLSDownloadSmokeMain {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockHLSURLProtocol.self]
         let session = URLSession(configuration: configuration)
-        let downloader = HLSMediaDownloader(session: session)
+        let exporter = MockHLSExporter()
+        let downloader = HLSMediaDownloader(session: session, exporter: exporter)
         let destinationDirectory = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
             .appendingPathComponent("SaveXHLSSmoke-\(UUID().uuidString)", isDirectory: true)
         defer {
@@ -128,9 +130,112 @@ struct HLSDownloadSmokeMain {
             destinationDirectory: destinationDirectory
         )
 
-        try expect(asset.localFileURL.pathExtension == "ts", "HLS output should be a TS file")
-        try expect(asset.fileSize == 5, "HLS output size should equal concatenated segment size")
+        try expect(asset.localFileURL.pathExtension == "mp4", "HLS output should be an MP4 file")
+        try expect(asset.responseMimeType == "video/mp4", "HLS output MIME type should be video/mp4")
+        try expect(asset.fileSize == 5, "HLS output size should come from exported MP4")
         let outputData = try Data(contentsOf: asset.localFileURL)
         try expect(outputData == Data([0x47, 0x11, 0x12, 0x47, 0x21]), "HLS output bytes were not concatenated in order")
+        try expect(exporter.sourceURL?.pathExtension == "ts", "exporter should receive the temporary assembled TS file")
+        try expect(exporter.destinationURL == asset.localFileURL, "downloader should return the exporter destination")
+        let hasTemporaryDirectory = try hasTemporaryHLSDirectory(in: destinationDirectory)
+        try expect(!hasTemporaryDirectory, "temporary HLS working directory should be cleaned up")
     }
+
+    private static func testHLSExportFailure() async throws {
+        let masterURL = URL(string: "https://video.example.test/failure-master.m3u8")!
+        let mediaURL = URL(string: "https://video.example.test/failure/index.m3u8")!
+        let segmentURL = URL(string: "https://video.example.test/failure/segment-1.ts")!
+
+        MockHLSURLProtocol.responses = [
+            masterURL: (200, Data("""
+            #EXTM3U
+            #EXT-X-STREAM-INF:BANDWIDTH=1000000,RESOLUTION=640x360
+            failure/index.m3u8
+            """.utf8), "application/vnd.apple.mpegurl"),
+            mediaURL: (200, Data("""
+            #EXTM3U
+            #EXTINF:1.0,
+            segment-1.ts
+            #EXT-X-ENDLIST
+            """.utf8), "application/vnd.apple.mpegurl"),
+            segmentURL: (200, Data([0x47, 0x31]), "video/MP2T"),
+        ]
+
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockHLSURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        let downloader = HLSMediaDownloader(
+            session: session,
+            exporter: MockHLSExporter(error: HLSDownloadSmokeError.failed("mock export failed"))
+        )
+        let destinationDirectory = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+            .appendingPathComponent("SaveXHLSFailureSmoke-\(UUID().uuidString)", isDirectory: true)
+        defer {
+            try? FileManager.default.removeItem(at: destinationDirectory)
+        }
+
+        let format = MediaFormat(
+            id: "fixture-hls-failure",
+            url: masterURL,
+            formatID: "hls",
+            transport: .m3u8Native,
+            container: .mp4,
+            bitrate: nil,
+            width: nil,
+            height: nil,
+            fileSizeApprox: nil,
+            videoCodec: nil,
+            audioCodec: nil,
+            httpHeaders: [:]
+        )
+
+        do {
+            _ = try await downloader.download(
+                format: format,
+                tweetID: "1234567891",
+                title: "Fixture HLS Failure",
+                destinationDirectory: destinationDirectory
+            )
+            throw HLSDownloadSmokeError.failed("HLS export failure should fail the download")
+        } catch HLSDownloadSmokeError.failed("mock export failed") {
+        }
+
+        let contents = try FileManager.default.contentsOfDirectory(
+            at: destinationDirectory,
+            includingPropertiesForKeys: nil
+        )
+        try expect(!contents.contains { $0.pathExtension == "mp4" }, "failed export should not leave a final MP4")
+        let hasTemporaryDirectory = try hasTemporaryHLSDirectory(in: destinationDirectory)
+        try expect(!hasTemporaryDirectory, "failed export should clean up temporary HLS files")
+    }
+}
+
+private final class MockHLSExporter: HLSMediaExporting, @unchecked Sendable {
+    private let error: Error?
+    private(set) var sourceURL: URL?
+    private(set) var destinationURL: URL?
+
+    init(error: Error? = nil) {
+        self.error = error
+    }
+
+    func exportMP4(from sourceURL: URL, to destinationURL: URL) async throws {
+        self.sourceURL = sourceURL
+        self.destinationURL = destinationURL
+        if let error {
+            throw error
+        }
+        try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
+    }
+}
+
+private func hasTemporaryHLSDirectory(in directory: URL) throws -> Bool {
+    guard FileManager.default.fileExists(atPath: directory.path) else {
+        return false
+    }
+    let contents = try FileManager.default.contentsOfDirectory(
+        at: directory,
+        includingPropertiesForKeys: nil
+    )
+    return contents.contains { $0.lastPathComponent.hasPrefix(".savex-hls-") }
 }
