@@ -16,12 +16,8 @@
 </p>
 
 <p>
-  <a href="https://altstore.io/source/INP146.github.io/AltSource/source.json?app=com.savex">
-    <img src="docs/badges/DownloadBadge_dark.png" alt="Download on AltStore" height="45" />
-  </a>
-  <a href="sidestore://source?url=https%3A%2F%2FINP146.github.io%2FAltSource%2Fsource.json">
-    <img src="docs/badges/add-source-to-sidestore.png" alt="Add Source to SideStore" height="45" />
-  </a>
+  <a href="altstore://source?url=https%3A%2F%2FINP146.github.io%2FAltSource%2Fsource.json&app=com.savex"><img src="docs/badges/DownloadBadge_dark.png" alt="Download on AltStore" height="45" /></a>
+  <a href="sidestore://source?url=https%3A%2F%2FINP146.github.io%2FAltSource%2Fsource.json"><img src="docs/badges/add-source-to-sidestore.png" alt="Add Source to SideStore" height="45" /></a>
 </p>
 
 </div>
