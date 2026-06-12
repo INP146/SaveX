@@ -1,8 +1,21 @@
-# SaveX
+<div align="center">
 
-[English](README.md)
+<img src="docs/design/savex-iOS-Default-1024x1024@1x.png" alt="SaveX app icon" width="140" />
 
-SaveX 是一个 iOS SwiftUI 应用，用来把公开 Twitter/X 帖子里的视频下载到本地，并尝试保存到系统相册。
+<h1 align="center">SaveX</h1>
+
+<p><a href="README.md">🇺🇸 English</a></p>
+
+<p>SaveX 是一个 iOS SwiftUI 应用，用来把公开 Twitter/X 帖子里的视频下载到本地，并尝试保存到系统相册。</p>
+
+<p>
+  <img src="https://img.shields.io/badge/iOS-26.0%2B-000000?logo=apple&logoColor=white" alt="iOS 26.0+" />
+  <img src="https://img.shields.io/badge/Swift-5.0%2B-F05138?logo=swift&logoColor=white" alt="Swift 5.0+" />
+  <img src="https://img.shields.io/badge/SwiftUI-native-0D96F6?logo=swift&logoColor=white" alt="SwiftUI native" />
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT" /></a>
+</p>
+
+</div>
 
 ## 上游参考
 

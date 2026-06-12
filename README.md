@@ -1,8 +1,21 @@
-# SaveX
+<div align="center">
 
-[🇨🇳简体中文](README.zh-CN.md)
+<img src="docs/design/savex-iOS-Default-1024x1024@1x.png" alt="SaveX app icon" width="140" />
 
-SaveX is an iOS SwiftUI app for downloading videos from public Twitter/X posts to local storage and attempting to save them to the system Photos library.
+<h1 align="center">SaveX</h1>
+
+<p><a href="README.zh-CN.md">🇨🇳 简体中文</a></p>
+
+<p>SaveX is an iOS SwiftUI app for downloading videos from public Twitter/X posts to local storage and attempting to save them to the system Photos library.</p>
+
+<p>
+  <img src="https://img.shields.io/badge/iOS-26.0%2B-000000?logo=apple&logoColor=white" alt="iOS 26.0+" />
+  <img src="https://img.shields.io/badge/Swift-5.0%2B-F05138?logo=swift&logoColor=white" alt="Swift 5.0+" />
+  <img src="https://img.shields.io/badge/SwiftUI-native-0D96F6?logo=swift&logoColor=white" alt="SwiftUI native" />
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT" /></a>
+</p>
+
+</div>
 
 ## Upstream Reference
 

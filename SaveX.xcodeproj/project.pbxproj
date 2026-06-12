@@ -10,6 +10,7 @@
 		A00100010001000100010001 /* SaveXApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010001 /* SaveXApp.swift */; };
 		A00100010001000100010002 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010002 /* HomeView.swift */; };
 		A00100010001000100010003 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010003 /* Assets.xcassets */; };
+		A00100010001000100010040 /* savex.icon in Resources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010040 /* savex.icon */; };
 		A00100010001000100010004 /* AppContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010005 /* AppContainer.swift */; };
 		A00100010001000100010005 /* AppRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010006 /* AppRouter.swift */; };
 		A00100010001000100010006 /* JobsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010007 /* JobsView.swift */; };
@@ -54,6 +55,7 @@
 		A00100010002000100010002 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		A00100010002000100010003 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A00100010002000100010004 /* SaveX.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SaveX.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A00100010002000100010040 /* savex.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = savex.icon; sourceTree = "<group>"; };
 		A00100010002000100010005 /* AppContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppContainer.swift; sourceTree = "<group>"; };
 		A00100010002000100010006 /* AppRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRouter.swift; sourceTree = "<group>"; };
 		A00100010002000100010007 /* JobsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JobsView.swift; sourceTree = "<group>"; };
@@ -121,6 +123,7 @@
 				A00100010004000100010014 /* Infrastructure */,
 				A00100010004000100010019 /* Shared */,
 				A00100010002000100010003 /* Assets.xcassets */,
+				A00100010002000100010040 /* savex.icon */,
 			);
 			path = SaveX;
 			sourceTree = "<group>";
@@ -459,6 +462,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A00100010001000100010003 /* Assets.xcassets in Resources */,
+				A00100010001000100010040 /* savex.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -586,7 +590,7 @@
 		A0010001000A000100010003 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = savex;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"SaveX/Preview Content\"";
@@ -619,7 +623,7 @@
 		A0010001000A000100010004 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = savex;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"SaveX/Preview Content\"";

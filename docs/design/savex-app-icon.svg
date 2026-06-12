@@ -1,7 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
   <title>SaveX App Icon</title>
-  <desc>A flat white app icon with a black folder and the official-style white X mark.</desc>
-  <rect width="1024" height="1024" fill="#FFFFFF"/>
+  <desc>A Liquid Glass-ready app icon with a System Light style background, black folder, and official-style white X mark.</desc>
+  <defs>
+    <linearGradient id="systemLight" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="0.55" stop-color="#F6F7F8"/>
+      <stop offset="1" stop-color="#E7EAEE"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#systemLight)"/>
 
   <g fill="#0B0B0F">
     <path d="M162 318c0-46 38-84 84-84h192c29 0 56 15 72 40l38 58h230c46 0 84 38 84 84v304c0 54-44 98-98 98H260c-54 0-98-44-98-98V318Z"/>
