@@ -19,6 +19,7 @@ func expect(_ condition: @autoclosure () -> Bool, _ message: String) throws {
 
 final class MockHLSURLProtocol: URLProtocol {
     static var responses: [URL: (status: Int, body: Data, mimeType: String?)] = [:]
+    static var requestCounts: [URL: Int] = [:]
 
     override class func canInit(with request: URLRequest) -> Bool {
         request.url?.host == "video.example.test"
@@ -41,6 +42,7 @@ final class MockHLSURLProtocol: URLProtocol {
             return
         }
 
+        Self.requestCounts[url, default: 0] += 1
         client?.urlProtocol(self, didReceive: httpResponse, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: response.body)
         client?.urlProtocolDidFinishLoading(self)
@@ -56,6 +58,7 @@ struct HLSDownloadSmokeMain {
         do {
             try await testHLSDownload()
             try await testHLSExportFailure()
+            try await testHLSResumeReusesCompletedSegments()
             print("hls download smoke passed")
         } catch {
             print("FAILED: \(error.localizedDescription)")
@@ -208,6 +211,105 @@ struct HLSDownloadSmokeMain {
         let hasTemporaryDirectory = try hasTemporaryHLSDirectory(in: destinationDirectory)
         try expect(!hasTemporaryDirectory, "failed export should clean up temporary HLS files")
     }
+
+    private static func testHLSResumeReusesCompletedSegments() async throws {
+        let masterURL = URL(string: "https://video.example.test/resume-master.m3u8")!
+        let mediaURL = URL(string: "https://video.example.test/resume/index.m3u8")!
+        let firstSegmentURL = URL(string: "https://video.example.test/resume/segment-1.ts")!
+        let secondSegmentURL = URL(string: "https://video.example.test/resume/segment-2.ts")!
+        let jobID = UUID()
+
+        let root = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+            .appendingPathComponent("SaveXHLSResumeSmoke-\(UUID().uuidString)", isDirectory: true)
+        defer {
+            try? FileManager.default.removeItem(at: root)
+        }
+        let fileManager = SmokeFileManager(root: root)
+        let destinationDirectory = root.appendingPathComponent("Downloads", isDirectory: true)
+        try FileManager.default.createDirectory(at: destinationDirectory, withIntermediateDirectories: true)
+
+        let format = MediaFormat(
+            id: "fixture-hls-resume",
+            url: masterURL,
+            formatID: "hls-resume",
+            transport: .m3u8Native,
+            container: .mp4,
+            bitrate: nil,
+            width: nil,
+            height: nil,
+            fileSizeApprox: nil,
+            videoCodec: nil,
+            audioCodec: nil,
+            httpHeaders: [:]
+        )
+
+        MockHLSURLProtocol.responses = [
+            masterURL: (200, Data("""
+            #EXTM3U
+            #EXT-X-STREAM-INF:BANDWIDTH=1000000,RESOLUTION=640x360
+            resume/index.m3u8
+            """.utf8), "application/vnd.apple.mpegurl"),
+            mediaURL: (200, Data("""
+            #EXTM3U
+            #EXTINF:1.0,
+            segment-1.ts
+            #EXTINF:1.0,
+            segment-2.ts
+            #EXT-X-ENDLIST
+            """.utf8), "application/vnd.apple.mpegurl"),
+            firstSegmentURL: (200, Data([0x47, 0x41]), "video/MP2T"),
+            secondSegmentURL: (200, Data([0x47, 0x42]), "video/MP2T"),
+        ]
+        MockHLSURLProtocol.requestCounts = [:]
+
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockHLSURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        let failingDownloader = HLSMediaDownloader(
+            session: session,
+            exporter: MockHLSExporter(error: HLSDownloadSmokeError.failed("mock resume export failed")),
+            fileManager: fileManager
+        )
+
+        do {
+            _ = try await failingDownloader.download(
+                jobID: jobID,
+                format: format,
+                tweetID: "1234567892",
+                title: "Fixture HLS Resume",
+                destinationDirectory: destinationDirectory
+            )
+            throw HLSDownloadSmokeError.failed("first HLS resume run should fail during export")
+        } catch HLSDownloadSmokeError.failed("mock resume export failed") {
+        }
+
+        try expect(MockHLSURLProtocol.requestCounts[firstSegmentURL] == 1, "first run should download segment 1")
+        try expect(MockHLSURLProtocol.requestCounts[secondSegmentURL] == 1, "first run should download segment 2")
+
+        MockHLSURLProtocol.responses = [
+            masterURL: MockHLSURLProtocol.responses[masterURL]!,
+            mediaURL: MockHLSURLProtocol.responses[mediaURL]!,
+        ]
+        MockHLSURLProtocol.requestCounts = [:]
+
+        let resumedDownloader = HLSMediaDownloader(
+            session: session,
+            exporter: MockHLSExporter(),
+            fileManager: fileManager
+        )
+        let asset = try await resumedDownloader.download(
+            jobID: jobID,
+            format: format,
+            tweetID: "1234567892",
+            title: "Fixture HLS Resume",
+            destinationDirectory: destinationDirectory
+        )
+
+        let outputData = try Data(contentsOf: asset.localFileURL)
+        try expect(outputData == Data([0x47, 0x41, 0x47, 0x42]), "resumed HLS output should reuse local segments in order")
+        try expect(MockHLSURLProtocol.requestCounts[firstSegmentURL] == nil, "second run should not request segment 1")
+        try expect(MockHLSURLProtocol.requestCounts[secondSegmentURL] == nil, "second run should not request segment 2")
+    }
 }
 
 private final class MockHLSExporter: HLSMediaExporting, @unchecked Sendable {
@@ -238,4 +340,24 @@ private func hasTemporaryHLSDirectory(in directory: URL) throws -> Bool {
         includingPropertiesForKeys: nil
     )
     return contents.contains { $0.lastPathComponent.hasPrefix(".savex-hls-") }
+}
+
+private final class SmokeFileManager: FileManager, @unchecked Sendable {
+    private let root: URL
+
+    init(root: URL) {
+        self.root = root
+        super.init()
+    }
+
+    override func urls(for directory: FileManager.SearchPathDirectory, in domainMask: FileManager.SearchPathDomainMask) -> [URL] {
+        switch directory {
+        case .applicationSupportDirectory:
+            return [root.appendingPathComponent("ApplicationSupport", isDirectory: true)]
+        case .documentDirectory:
+            return [root.appendingPathComponent("Documents", isDirectory: true)]
+        default:
+            return super.urls(for: directory, in: domainMask)
+        }
+    }
 }

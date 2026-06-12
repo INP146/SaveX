@@ -1,6 +1,6 @@
 import Foundation
 
-struct TweetRequest: Sendable, Equatable {
+struct TweetRequest: Codable, Sendable, Equatable {
     let sourceURL: URL
     let tweetID: String
     let screenName: String?
@@ -11,7 +11,7 @@ struct TweetRequest: Sendable, Equatable {
     }
 }
 
-enum MediaTransport: String, Sendable {
+enum MediaTransport: String, Codable, Sendable {
     case http
     case https
     case m3u8
@@ -20,33 +20,33 @@ enum MediaTransport: String, Sendable {
     case unknown
 }
 
-enum MediaContainer: String, Sendable {
+enum MediaContainer: String, Codable, Sendable {
     case mp4
     case m3u8
     case ts
     case unknown
 }
 
-enum FormatSortField: String, Sendable {
+enum FormatSortField: String, Codable, Sendable {
     case resolution
     case preferM3U8
     case bitrate
     case fileSize
 }
 
-struct MediaSubtitle: Sendable {
+struct MediaSubtitle: Codable, Sendable {
     let languageCode: String
     let url: URL
 }
 
-struct MediaThumbnail: Sendable {
+struct MediaThumbnail: Codable, Sendable {
     let id: String
     let url: URL
     let width: Int?
     let height: Int?
 }
 
-struct MediaFormat: Identifiable, Sendable {
+struct MediaFormat: Identifiable, Codable, Sendable {
     let id: String
     let url: URL
     let formatID: String
@@ -93,7 +93,7 @@ struct TweetMediaInfo: Identifiable, Sendable {
     let formatSortFields: [FormatSortField]
 }
 
-enum DownloadJobPhase: String, Sendable {
+enum DownloadJobPhase: String, Codable, Sendable {
     case idle
     case queued
     case validatingURL
@@ -104,6 +104,10 @@ enum DownloadJobPhase: String, Sendable {
     case selectingFormat
     case preparingDownload
     case downloading
+    case waitingForSystem
+    case paused
+    case exportingMedia
+    case savingToPhotos
     case ready
     case completed
     case failed
@@ -125,7 +129,55 @@ struct DownloadTraceEvent: Sendable {
     let message: String
 }
 
-struct DownloadJob: Identifiable, Sendable {
+struct DownloadProgressEvent: Sendable {
+    enum Kind: String, Sendable {
+        case phase
+        case fileTransfer
+        case hlsSegment
+        case export
+        case photoSave
+    }
+
+    let kind: Kind
+    let phase: DownloadJobPhase
+    let progress: Double
+    let formatID: String?
+    let downloadedBytes: Int64?
+    let totalBytes: Int64?
+    let speedBytesPerSecond: Double?
+    let etaSeconds: TimeInterval?
+    let completedSegmentCount: Int?
+    let totalSegmentCount: Int?
+    let message: String?
+
+    init(
+        kind: Kind,
+        phase: DownloadJobPhase,
+        progress: Double,
+        formatID: String? = nil,
+        downloadedBytes: Int64? = nil,
+        totalBytes: Int64? = nil,
+        speedBytesPerSecond: Double? = nil,
+        etaSeconds: TimeInterval? = nil,
+        completedSegmentCount: Int? = nil,
+        totalSegmentCount: Int? = nil,
+        message: String? = nil
+    ) {
+        self.kind = kind
+        self.phase = phase
+        self.progress = min(max(progress, 0), 1)
+        self.formatID = formatID
+        self.downloadedBytes = downloadedBytes
+        self.totalBytes = totalBytes
+        self.speedBytesPerSecond = speedBytesPerSecond
+        self.etaSeconds = etaSeconds
+        self.completedSegmentCount = completedSegmentCount
+        self.totalSegmentCount = totalSegmentCount
+        self.message = message
+    }
+}
+
+struct DownloadJob: Identifiable, Codable, Sendable {
     let id: UUID
     let request: TweetRequest
     var phase: DownloadJobPhase
@@ -136,6 +188,13 @@ struct DownloadJob: Identifiable, Sendable {
     var localFileURL: URL?
     var savedFileSize: Int64?
     var errorMessage: String?
+    var downloadedBytes: Int64?
+    var totalBytes: Int64?
+    var speedBytesPerSecond: Double?
+    var etaSeconds: TimeInterval?
+    var completedSegmentCount: Int?
+    var totalSegmentCount: Int?
+    var progressMessage: String?
 
     init(
         id: UUID = UUID(),
@@ -147,7 +206,14 @@ struct DownloadJob: Identifiable, Sendable {
         outputFilename: String? = nil,
         localFileURL: URL? = nil,
         savedFileSize: Int64? = nil,
-        errorMessage: String? = nil
+        errorMessage: String? = nil,
+        downloadedBytes: Int64? = nil,
+        totalBytes: Int64? = nil,
+        speedBytesPerSecond: Double? = nil,
+        etaSeconds: TimeInterval? = nil,
+        completedSegmentCount: Int? = nil,
+        totalSegmentCount: Int? = nil,
+        progressMessage: String? = nil
     ) {
         self.id = id
         self.request = request
@@ -159,5 +225,12 @@ struct DownloadJob: Identifiable, Sendable {
         self.localFileURL = localFileURL
         self.savedFileSize = savedFileSize
         self.errorMessage = errorMessage
+        self.downloadedBytes = downloadedBytes
+        self.totalBytes = totalBytes
+        self.speedBytesPerSecond = speedBytesPerSecond
+        self.etaSeconds = etaSeconds
+        self.completedSegmentCount = completedSegmentCount
+        self.totalSegmentCount = totalSegmentCount
+        self.progressMessage = progressMessage
     }
 }

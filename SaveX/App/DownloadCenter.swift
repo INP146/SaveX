@@ -63,6 +63,71 @@ struct LocalLibraryItem: Identifiable, Codable, Sendable, Equatable {
     }
 }
 
+struct DownloadJobRecord: Codable, Sendable {
+    let job: DownloadJob
+    let preference: FormatSelectionPreference
+    let updatedAt: Date
+
+    init(
+        job: DownloadJob,
+        preference: FormatSelectionPreference,
+        updatedAt: Date = Date()
+    ) {
+        self.job = job
+        self.preference = preference
+        self.updatedAt = updatedAt
+    }
+}
+
+struct DownloadJobStore {
+    private let fileManager: FileManager
+    private let recordsURL: URL
+
+    init(fileManager: FileManager = .default) {
+        self.fileManager = fileManager
+        self.recordsURL = Self.recordsURL(fileManager: fileManager)
+    }
+
+    func load() -> [DownloadJobRecord] {
+        guard let data = try? Data(contentsOf: recordsURL),
+              let records = try? JSONDecoder.saveXLibraryDecoder.decode([DownloadJobRecord].self, from: data) else {
+            return []
+        }
+        return records.sorted { $0.updatedAt > $1.updatedAt }
+    }
+
+    func upsert(_ record: DownloadJobRecord) {
+        var records = load()
+        records.removeAll { $0.job.id == record.job.id }
+        records.insert(record, at: 0)
+        save(records)
+    }
+
+    func remove(jobID: UUID) {
+        var records = load()
+        records.removeAll { $0.job.id == jobID }
+        save(records)
+    }
+
+    private func save(_ records: [DownloadJobRecord]) {
+        do {
+            try fileManager.createDirectory(at: recordsURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            let data = try JSONEncoder.saveXLibraryEncoder.encode(records)
+            try data.write(to: recordsURL, options: .atomic)
+        } catch {
+            assertionFailure("Failed to persist download jobs: \(error.localizedDescription)")
+        }
+    }
+
+    private static func recordsURL(fileManager: FileManager) -> URL {
+        let applicationSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? fileManager.temporaryDirectory
+        return applicationSupport
+            .appendingPathComponent("SaveX", isDirectory: true)
+            .appendingPathComponent("jobs.json", isDirectory: false)
+    }
+}
+
 @MainActor
 final class DownloadCenter: ObservableObject {
     @Published private(set) var jobs: [DownloadJob]
@@ -72,6 +137,10 @@ final class DownloadCenter: ObservableObject {
 
     private let container: AppContainer
     private let fileManager: FileManager
+    private let jobStore: DownloadJobStore
+    private let shouldPersistJobs: Bool
+    private var jobPreferences: [UUID: FormatSelectionPreference]
+    private var downloadTasks: [UUID: Task<Void, Never>] = [:]
 
     init(
         container: AppContainer,
@@ -80,16 +149,30 @@ final class DownloadCenter: ObservableObject {
         logs: [DownloadLogEntry] = [],
         libraryItems: [LocalLibraryItem] = [],
         loadPersistedLibrary: Bool = true,
+        loadPersistedJobs: Bool = true,
         fileManager: FileManager = .default
     ) {
+        let jobStore = DownloadJobStore(fileManager: fileManager)
+        let restoredRecords = loadPersistedJobs ? jobStore.load() : []
+        let restoredJobs = restoredRecords.map { Self.restoredJob(from: $0.job) }
+
         self.container = container
-        self.jobs = jobs
+        self.jobs = jobs.isEmpty && loadPersistedJobs ? restoredJobs : jobs
         self.banner = banner
         self.logs = logs
         self.fileManager = fileManager
+        self.jobStore = jobStore
+        self.shouldPersistJobs = loadPersistedJobs
+        self.jobPreferences = Dictionary(uniqueKeysWithValues: restoredRecords.map { ($0.job.id, $0.preference) })
         self.libraryItems = loadPersistedLibrary
             ? Self.loadLibraryItems(fileManager: fileManager)
             : libraryItems
+
+        BackgroundHTTPDownloadCoordinator.shared.setDetachedCompletionHandler { [weak self] jobID, asset in
+            Task {
+                await self?.handleDetachedBackgroundCompletion(jobID: jobID, asset: asset)
+            }
+        }
     }
 
     var activeCount: Int {
@@ -111,6 +194,10 @@ final class DownloadCenter: ObservableObject {
     }
 
     func prepareCapabilities() async {
+        await consumeDetachedBackgroundCompletions()
+        await observeRestoredBackgroundTasks()
+        await restartInterruptedBackgroundFailures()
+
         let isAllowed = await container.photoLibraryWriter.requestAddOnlyAccess()
         banner = DownloadBanner(
             text: isAllowed ? "Photos access ready" : "Allow Photos access to save videos to your album",
@@ -122,6 +209,211 @@ final class DownloadCenter: ObservableObject {
             message: isAllowed ? "Add-only Photos access is ready" : "Photos access was not granted",
             tweetID: nil
         )
+    }
+
+    private func observeRestoredBackgroundTasks() async {
+        let restoredJobIDs = Set(jobs.filter { $0.phase == .waitingForSystem }.map(\.id))
+        let attachedJobIDs = await BackgroundHTTPDownloadCoordinator.shared.observeRestoredTasks(jobIDs: restoredJobIDs) { [weak self] jobID, event in
+            await self?.applyProgressEvent(jobID: jobID, event: event)
+        }
+
+        for jobID in restoredJobIDs.subtracting(attachedJobIDs) {
+            guard let job = jobs.first(where: { $0.id == jobID }) else {
+                continue
+            }
+            await BackgroundHTTPDownloadCoordinator.shared.cancel(jobID: jobID)
+            restartJobAfterCleanup(
+                job,
+                progressMessage: "Restarting after app interruption",
+                logKind: .warning,
+                logTitle: "Background task restarted",
+                logMessage: "iOS no longer has the previous background download task, so SaveX is starting it again."
+            )
+            appendLog(
+                kind: .warning,
+                title: "Background task missing",
+                message: "The previous background download task was not registered with iOS on launch.",
+                jobID: jobID,
+                tweetID: job.request.tweetID
+            )
+        }
+    }
+
+    private func restartInterruptedBackgroundFailures() async {
+        let interruptedJobs = jobs.filter(Self.isInterruptedBackgroundFailure)
+        for job in interruptedJobs {
+            await BackgroundHTTPDownloadCoordinator.shared.cancel(jobID: job.id)
+            restartJobAfterCleanup(
+                job,
+                progressMessage: "Restarting interrupted download",
+                logKind: .warning,
+                logTitle: "Interrupted job restarted",
+                logMessage: "A previous launch marked this job failed because the iOS background task was missing, so SaveX is starting it again."
+            )
+        }
+    }
+
+    private func consumeDetachedBackgroundCompletions() async {
+        let completions = BackgroundHTTPDownloadCoordinator.shared.drainDetachedCompletions()
+        for (jobID, asset) in completions {
+            await handleDetachedBackgroundCompletion(jobID: jobID, asset: asset)
+        }
+    }
+
+    private func handleDetachedBackgroundCompletion(jobID: UUID, asset: DownloadedAsset) async {
+        guard let job = jobs.first(where: { $0.id == jobID }) else {
+            BackgroundHTTPDownloadCoordinator.shared.acknowledgeDetachedCompletion(jobID: jobID)
+            return
+        }
+
+        updateJob(id: jobID) { job in
+            job.phase = .completed
+            job.progress = 1
+            job.displayTitle = asset.localFileURL.deletingPathExtension().lastPathComponent
+            job.selectedFormatID = asset.format.formatID
+            job.outputFilename = asset.localFileURL.lastPathComponent
+            job.localFileURL = asset.localFileURL
+            job.savedFileSize = asset.fileSize
+            job.downloadedBytes = asset.fileSize
+            job.totalBytes = asset.fileSize
+            job.speedBytesPerSecond = nil
+            job.etaSeconds = nil
+            job.progressMessage = nil
+            job.errorMessage = nil
+        }
+        recordLibraryItem(asset: asset, request: job.request)
+
+        do {
+            try await container.photoLibraryWriter.saveVideoToLibrary(at: asset.localFileURL)
+            banner = DownloadBanner(text: "Saved \(asset.localFileURL.lastPathComponent) to Photos", kind: .success)
+            appendLog(kind: .success, title: "Background download saved", message: asset.localFileURL.lastPathComponent, jobID: jobID, tweetID: job.request.tweetID)
+        } catch {
+            banner = DownloadBanner(
+                text: "Downloaded \(asset.localFileURL.lastPathComponent), but Photos save failed: \(error.localizedDescription)",
+                kind: .error
+            )
+            appendLog(kind: .warning, title: "Background Photos save failed", message: error.localizedDescription, jobID: jobID, tweetID: job.request.tweetID)
+        }
+
+        BackgroundHTTPDownloadCoordinator.shared.acknowledgeDetachedCompletion(jobID: jobID)
+    }
+
+    func retryJob(_ job: DownloadJob) {
+        let preference = jobPreferences[job.id] ?? .ytDLPCompatible
+        jobPreferences[job.id] = preference
+        downloadTasks[job.id]?.cancel()
+        downloadTasks.removeValue(forKey: job.id)
+
+        Task { @MainActor [weak self] in
+            guard let self else {
+                return
+            }
+            await BackgroundHTTPDownloadCoordinator.shared.cancel(jobID: job.id)
+            self.restartJobAfterCleanup(
+                job,
+                progressMessage: "Queued retry",
+                logKind: .info,
+                logTitle: "Retry queued",
+                logMessage: "Retrying \(preference.logLabel) route."
+            )
+        }
+    }
+
+    func pauseJob(_ job: DownloadJob) {
+        guard !job.phase.isTerminal, job.phase != .paused else {
+            return
+        }
+
+        updateJob(id: job.id) { storedJob in
+            storedJob.phase = .paused
+            storedJob.progressMessage = "Paused"
+            storedJob.speedBytesPerSecond = nil
+            storedJob.etaSeconds = nil
+        }
+        appendLog(kind: .info, title: "Paused", message: "Paused download task.", jobID: job.id, tweetID: job.request.tweetID)
+
+        downloadTasks[job.id]?.cancel()
+        Task {
+            _ = await BackgroundHTTPDownloadCoordinator.shared.pause(jobID: job.id)
+        }
+    }
+
+    func resumeJob(_ job: DownloadJob) {
+        guard job.phase == .paused else {
+            return
+        }
+        let preference = jobPreferences[job.id] ?? .ytDLPCompatible
+        jobPreferences[job.id] = preference
+        updateJob(id: job.id) { storedJob in
+            storedJob.phase = .queued
+            storedJob.progressMessage = "Resuming"
+            storedJob.errorMessage = nil
+            storedJob.speedBytesPerSecond = nil
+            storedJob.etaSeconds = nil
+        }
+        appendLog(kind: .info, title: "Resume queued", message: "Continuing \(preference.logLabel) route.", jobID: job.id, tweetID: job.request.tweetID)
+        startDownloadTask(jobID: job.id, request: job.request, preference: preference)
+    }
+
+    private func restartJobAfterCleanup(
+        _ job: DownloadJob,
+        progressMessage: String,
+        logKind: DownloadLogEntry.Kind,
+        logTitle: String,
+        logMessage: String
+    ) {
+        guard jobs.contains(where: { $0.id == job.id }) else {
+            return
+        }
+
+        let preference = jobPreferences[job.id] ?? .ytDLPCompatible
+        jobPreferences[job.id] = preference
+
+        updateJob(id: job.id) { storedJob in
+            storedJob.phase = .queued
+            storedJob.progress = 0.08
+            storedJob.displayTitle = "Tweet \(storedJob.request.tweetID)"
+            storedJob.selectedFormatID = nil
+            storedJob.outputFilename = nil
+            storedJob.localFileURL = nil
+            storedJob.savedFileSize = nil
+            storedJob.errorMessage = nil
+            storedJob.downloadedBytes = nil
+            storedJob.totalBytes = nil
+            storedJob.speedBytesPerSecond = nil
+            storedJob.etaSeconds = nil
+            storedJob.completedSegmentCount = nil
+            storedJob.totalSegmentCount = nil
+            storedJob.progressMessage = progressMessage
+        }
+        appendLog(
+            kind: logKind,
+            title: logTitle,
+            message: logMessage,
+            jobID: job.id,
+            tweetID: job.request.tweetID
+        )
+
+        startDownloadTask(jobID: job.id, request: job.request, preference: preference)
+    }
+
+    private func isPausedJob(id: UUID) -> Bool {
+        jobs.first(where: { $0.id == id })?.phase == .paused
+    }
+
+    func deleteJob(_ job: DownloadJob) {
+        downloadTasks[job.id]?.cancel()
+        downloadTasks.removeValue(forKey: job.id)
+        jobs.removeAll { $0.id == job.id }
+        jobPreferences.removeValue(forKey: job.id)
+        if shouldPersistJobs {
+            jobStore.remove(jobID: job.id)
+        }
+        appendLog(kind: .info, title: "Deleted job", message: "Removed job from Jobs.", jobID: job.id, tweetID: job.request.tweetID)
+
+        Task {
+            await BackgroundHTTPDownloadCoordinator.shared.cancel(jobID: job.id)
+        }
     }
 
     @discardableResult
@@ -142,6 +434,8 @@ final class DownloadCenter: ObservableObject {
                 displayTitle: "Tweet \(request.tweetID)"
             )
             jobs.insert(job, at: 0)
+            jobPreferences[job.id] = preference
+            persistJob(job)
             banner = DownloadBanner(text: "Queued tweet \(request.tweetID)", kind: .info)
             appendLog(
                 kind: .info,
@@ -151,14 +445,23 @@ final class DownloadCenter: ObservableObject {
                 tweetID: request.tweetID
             )
 
-            Task {
-                await runDownload(jobID: job.id, request: request, preference: preference)
-            }
+            startDownloadTask(jobID: job.id, request: request, preference: preference)
             return true
         } catch {
             banner = DownloadBanner(text: error.localizedDescription, kind: .error)
             appendLog(kind: .error, title: "URL parse failed", message: error.localizedDescription, tweetID: nil)
             return false
+        }
+    }
+
+    private func startDownloadTask(
+        jobID: UUID,
+        request: TweetRequest,
+        preference: FormatSelectionPreference
+    ) {
+        downloadTasks[jobID]?.cancel()
+        downloadTasks[jobID] = Task { @MainActor [weak self] in
+            await self?.runDownload(jobID: jobID, request: request, preference: preference)
         }
     }
 
@@ -175,15 +478,14 @@ final class DownloadCenter: ObservableObject {
 
         do {
             let asset = try await container.downloadEngine.download(
+                jobID: jobID,
                 request: request,
                 preference: preference,
                 destinationDirectory: downloadsDirectory
-            ) { [weak self] phase, progress, formatID in
-                await self?.applyProgress(
+            ) { [weak self] event in
+                await self?.applyProgressEvent(
                     jobID: jobID,
-                    phase: phase,
-                    progress: progress,
-                    formatID: formatID
+                    event: event
                 )
             } onTraceEvent: { [weak self] event in
                 await self?.appendLog(
@@ -203,21 +505,63 @@ final class DownloadCenter: ObservableObject {
                 job.outputFilename = asset.localFileURL.lastPathComponent
                 job.localFileURL = asset.localFileURL
                 job.savedFileSize = asset.fileSize
+                job.downloadedBytes = asset.fileSize
+                job.totalBytes = asset.fileSize
+                job.speedBytesPerSecond = nil
+                job.etaSeconds = nil
+                if job.totalSegmentCount != nil {
+                    job.completedSegmentCount = job.totalSegmentCount
+                }
+                job.progressMessage = nil
                 job.errorMessage = nil
             }
             recordLibraryItem(asset: asset, request: request)
+            applyProgressEvent(
+                jobID: jobID,
+                event: DownloadProgressEvent(
+                    kind: .photoSave,
+                    phase: .savingToPhotos,
+                    progress: 0.98,
+                    formatID: asset.format.formatID,
+                    downloadedBytes: asset.fileSize,
+                    totalBytes: asset.fileSize,
+                    message: "Saving to Photos"
+                )
+            )
             do {
                 try await container.photoLibraryWriter.saveVideoToLibrary(at: asset.localFileURL)
+                updateJob(id: jobID) { job in
+                    job.phase = .completed
+                    job.progress = 1
+                    job.progressMessage = nil
+                }
                 banner = DownloadBanner(text: "Saved \(asset.localFileURL.lastPathComponent) to Photos", kind: .success)
                 appendLog(kind: .success, title: "Saved to Photos", message: asset.localFileURL.lastPathComponent, jobID: jobID, tweetID: request.tweetID)
             } catch {
+                updateJob(id: jobID) { job in
+                    job.phase = .completed
+                    job.progress = 1
+                    job.progressMessage = nil
+                }
                 banner = DownloadBanner(
                     text: "Downloaded \(asset.localFileURL.lastPathComponent), but Photos save failed: \(error.localizedDescription)",
                     kind: .error
                 )
                 appendLog(kind: .warning, title: "Photos save failed", message: error.localizedDescription, jobID: jobID, tweetID: request.tweetID)
             }
+            downloadTasks.removeValue(forKey: jobID)
         } catch {
+            if Self.isPauseError(error) || isPausedJob(id: jobID) {
+                updateJob(id: jobID) { job in
+                    job.phase = .paused
+                    job.progressMessage = "Paused"
+                    job.speedBytesPerSecond = nil
+                    job.etaSeconds = nil
+                }
+                appendLog(kind: .info, title: "Paused", message: "Download can be continued later.", jobID: jobID, tweetID: request.tweetID)
+                return
+            }
+            downloadTasks.removeValue(forKey: jobID)
             updateJob(id: jobID) { job in
                 job.phase = .failed
                 job.progress = min(job.progress, 0.96)
@@ -228,18 +572,31 @@ final class DownloadCenter: ObservableObject {
         }
     }
 
-    private func applyProgress(
+    private func applyProgressEvent(
         jobID: UUID,
-        phase: DownloadJobPhase,
-        progress: Double,
-        formatID: String?
+        event: DownloadProgressEvent
     ) {
         updateJob(id: jobID) { job in
-            job.phase = phase
-            job.progress = progress
-            if let formatID {
+            job.phase = event.phase
+            job.progress = event.progress
+            if let formatID = event.formatID {
                 job.selectedFormatID = formatID
             }
+            if let downloadedBytes = event.downloadedBytes {
+                job.downloadedBytes = downloadedBytes
+            }
+            if let totalBytes = event.totalBytes {
+                job.totalBytes = totalBytes
+            }
+            job.speedBytesPerSecond = event.speedBytesPerSecond
+            job.etaSeconds = event.etaSeconds
+            if let completedSegmentCount = event.completedSegmentCount {
+                job.completedSegmentCount = completedSegmentCount
+            }
+            if let totalSegmentCount = event.totalSegmentCount {
+                job.totalSegmentCount = totalSegmentCount
+            }
+            job.progressMessage = event.message
         }
     }
 
@@ -248,6 +605,22 @@ final class DownloadCenter: ObservableObject {
             return
         }
         mutate(&jobs[index])
+        persistJob(jobs[index])
+    }
+
+    private func persistJob(_ job: DownloadJob) {
+        guard shouldPersistJobs else {
+            return
+        }
+        if job.phase == .completed {
+            jobStore.remove(jobID: job.id)
+            jobPreferences.removeValue(forKey: job.id)
+            return
+        }
+        guard let preference = jobPreferences[job.id] else {
+            return
+        }
+        jobStore.upsert(DownloadJobRecord(job: job, preference: preference))
     }
 
     func clearLogs() {
@@ -339,6 +712,44 @@ final class DownloadCenter: ObservableObject {
         return items.filter { item in
             fileManager.fileExists(atPath: downloads.appendingPathComponent(item.fileName).path)
         }
+    }
+
+    private static func restoredJob(from storedJob: DownloadJob) -> DownloadJob {
+        var job = storedJob
+        guard !job.phase.isTerminal else {
+            return job
+        }
+        if job.phase == .paused {
+            job.progressMessage = "Paused"
+            job.speedBytesPerSecond = nil
+            job.etaSeconds = nil
+            return job
+        }
+        job.phase = .waitingForSystem
+        job.progressMessage = "Waiting for background session"
+        job.speedBytesPerSecond = nil
+        job.etaSeconds = nil
+        return job
+    }
+
+    private static func isPauseError(_ error: Error) -> Bool {
+        if case SaveXError.downloadPaused = error {
+            return true
+        }
+        if error is CancellationError {
+            return true
+        }
+        let nsError = error as NSError
+        return nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled
+    }
+
+    private static func isInterruptedBackgroundFailure(_ job: DownloadJob) -> Bool {
+        guard job.phase == .failed,
+              let errorMessage = job.errorMessage?.lowercased() else {
+            return false
+        }
+        return errorMessage.contains("background download is no longer registered")
+            || errorMessage.contains("background download task was missing")
     }
 
     private var downloadsDirectory: URL {
@@ -501,7 +912,8 @@ extension DownloadCenter {
                     responseMimeType: "video/mp4"
                 ),
             ],
-            loadPersistedLibrary: false
+            loadPersistedLibrary: false,
+            loadPersistedJobs: false
         )
     }
 }

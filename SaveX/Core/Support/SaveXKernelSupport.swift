@@ -36,6 +36,7 @@ enum SaveXError: LocalizedError, Sendable {
     case notImplemented(String)
     case photoLibraryAccessDenied
     case photoLibrarySaveFailed
+    case downloadPaused
 
     var errorDescription: String? {
         switch self {
@@ -76,6 +77,8 @@ enum SaveXError: LocalizedError, Sendable {
             return "Photo library add access was denied"
         case .photoLibrarySaveFailed:
             return "The video could not be saved to Photos"
+        case .downloadPaused:
+            return "Download paused"
         }
     }
 }
