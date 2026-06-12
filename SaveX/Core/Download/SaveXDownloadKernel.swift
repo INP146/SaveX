@@ -26,33 +26,107 @@ struct DownloadPlanner {
     }
 }
 
+enum DownloadFileNaming {
+    static func uniqueDestinationURL(
+        in directory: URL,
+        baseName: String,
+        ext: String,
+        fileExists: (String) -> Bool
+    ) -> URL {
+        var candidate = directory.appendingPathComponent("\(baseName).\(ext)", isDirectory: false)
+        var index = 2
+        while fileExists(candidate.path) {
+            candidate = directory.appendingPathComponent("\(baseName)-\(index).\(ext)", isDirectory: false)
+            index += 1
+        }
+        return candidate
+    }
+
+    static func makeFilename(tweetID: String, title: String) -> String {
+        let allowed = CharacterSet.alphanumerics.union(.whitespaces).union(CharacterSet(charactersIn: "-_"))
+        let sanitizedScalars = title.unicodeScalars.map { allowed.contains($0) ? Character($0) : Character(" ") }
+        let sanitized = String(sanitizedScalars)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let prefix = sanitized.isEmpty ? "tweet-\(tweetID)" : sanitized
+        return cleanedTitle(prefix, limit: 60).replacingOccurrences(of: " ", with: "-")
+    }
+
+    static func fileExtension(for format: MediaFormat, mimeType: String?) -> String {
+        switch format.container {
+        case .mp4:
+            return "mp4"
+        case .m3u8:
+            return "m3u8"
+        case .ts:
+            return "ts"
+        case .unknown:
+            if let mimeType, mimeType.contains("mp4") {
+                return "mp4"
+            }
+            if let ext = format.url.pathExtension.split(separator: "?").first, !ext.isEmpty {
+                return String(ext)
+            }
+            return "bin"
+        }
+    }
+}
+
 protocol HLSMediaExporting: Sendable {
     func exportMP4(from sourceURL: URL, to destinationURL: URL) async throws
 }
 
 struct AVFoundationHLSMediaExporter: HLSMediaExporting {
     func exportMP4(from sourceURL: URL, to destinationURL: URL) async throws {
-        let asset = AVURLAsset(url: sourceURL)
-        guard let exportSession = AVAssetExportSession(
-            asset: asset,
-            presetName: AVAssetExportPresetPassthrough
-        ) else {
-            throw SaveXError.hlsExportFailed("AVFoundation could not create a passthrough export session")
-        }
-        guard exportSession.supportedFileTypes.contains(.mp4) else {
-            throw SaveXError.hlsExportFailed("AVFoundation does not support MP4 export for this HLS media")
-        }
+        let cancellationBox = HLSExportCancellationBox()
+        try await withTaskCancellationHandler {
+            let asset = AVURLAsset(url: sourceURL)
+            guard let exportSession = AVAssetExportSession(
+                asset: asset,
+                presetName: AVAssetExportPresetPassthrough
+            ) else {
+                throw SaveXError.hlsExportFailed("AVFoundation could not create a passthrough export session")
+            }
+            cancellationBox.set(exportSession)
+            guard exportSession.supportedFileTypes.contains(.mp4) else {
+                throw SaveXError.hlsExportFailed("AVFoundation does not support MP4 export for this HLS media")
+            }
 
-        exportSession.outputURL = destinationURL
-        exportSession.outputFileType = .mp4
-        exportSession.shouldOptimizeForNetworkUse = true
+            exportSession.outputURL = destinationURL
+            exportSession.outputFileType = .mp4
+            exportSession.shouldOptimizeForNetworkUse = true
 
-        do {
-            try await exportSession.export(to: destinationURL, as: .mp4)
-        } catch {
-            let reason = error.localizedDescription
-            throw SaveXError.hlsExportFailed(reason)
+            do {
+                try Task.checkCancellation()
+                try await exportSession.export(to: destinationURL, as: .mp4)
+                try Task.checkCancellation()
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                let reason = error.localizedDescription
+                throw SaveXError.hlsExportFailed(reason)
+            }
+        } onCancel: {
+            cancellationBox.cancel()
         }
+    }
+}
+
+private final class HLSExportCancellationBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var exportSession: AVAssetExportSession?
+
+    func set(_ exportSession: AVAssetExportSession) {
+        lock.lock()
+        self.exportSession = exportSession
+        lock.unlock()
+    }
+
+    func cancel() {
+        lock.lock()
+        let exportSession = exportSession
+        lock.unlock()
+        exportSession?.cancelExport()
     }
 }
 
@@ -156,6 +230,18 @@ struct HLSManifestParser {
                     throw SaveXError.unsupportedHLS("Encrypted media segments are not supported yet")
                 }
                 continue
+            }
+
+            if line.hasPrefix("#EXT-X-MAP:") {
+                throw SaveXError.unsupportedHLS("fMP4 HLS playlists with EXT-X-MAP are not supported yet")
+            }
+
+            if line.hasPrefix("#EXT-X-BYTERANGE:") {
+                throw SaveXError.unsupportedHLS("Byte-range HLS playlists are not supported yet")
+            }
+
+            if line == "#EXT-X-DISCONTINUITY" {
+                throw SaveXError.unsupportedHLS("HLS discontinuities are not supported yet")
             }
 
             if line.hasPrefix("#EXT-X-TARGETDURATION:") {
@@ -750,6 +836,7 @@ actor HLSMediaDownloader {
         ))
         do {
             try await exporter.exportMP4(from: assembledURL, to: destinationURL)
+            try Task.checkCancellation()
         } catch {
             if fileManager.fileExists(atPath: destinationURL.path) {
                 try? fileManager.removeItem(at: destinationURL)
@@ -824,23 +911,13 @@ actor HLSMediaDownloader {
     }
 
     private func uniqueDestinationURL(in directory: URL, baseName: String, ext: String) -> URL {
-        var candidate = directory.appendingPathComponent("\(baseName).\(ext)", isDirectory: false)
-        var index = 2
-        while fileManager.fileExists(atPath: candidate.path) {
-            candidate = directory.appendingPathComponent("\(baseName)-\(index).\(ext)", isDirectory: false)
-            index += 1
+        DownloadFileNaming.uniqueDestinationURL(in: directory, baseName: baseName, ext: ext) { path in
+            fileManager.fileExists(atPath: path)
         }
-        return candidate
     }
 
     private func makeFilename(tweetID: String, title: String) -> String {
-        let allowed = CharacterSet.alphanumerics.union(.whitespaces).union(CharacterSet(charactersIn: "-_"))
-        let sanitizedScalars = title.unicodeScalars.map { allowed.contains($0) ? Character($0) : Character(" ") }
-        let sanitized = String(sanitizedScalars)
-            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let prefix = sanitized.isEmpty ? "tweet-\(tweetID)" : sanitized
-        return cleanedTitle(prefix, limit: 60).replacingOccurrences(of: " ", with: "-")
+        DownloadFileNaming.makeFilename(tweetID: tweetID, title: title)
     }
 }
 
@@ -884,6 +961,7 @@ final class BackgroundHTTPDownloadCoordinator: NSObject, URLSessionDownloadDeleg
 
     private let fileManager: FileManager
     private let resumeStore: HTTPResumeStore
+    private let rangeFallbackSession: URLSession
     private let lock = NSLock()
     private var activeDownloads: [Int: ActiveDownload] = [:]
     private var restoredTaskObservers: [UUID: RestoredTaskObserver] = [:]
@@ -900,9 +978,14 @@ final class BackgroundHTTPDownloadCoordinator: NSObject, URLSessionDownloadDeleg
         return URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
     }()
 
-    init(fileManager: FileManager = .default, resumeStore: HTTPResumeStore? = nil) {
+    init(
+        fileManager: FileManager = .default,
+        resumeStore: HTTPResumeStore? = nil,
+        rangeFallbackSession: URLSession = .shared
+    ) {
         self.fileManager = fileManager
         self.resumeStore = resumeStore ?? HTTPResumeStore(fileManager: fileManager)
+        self.rangeFallbackSession = rangeFallbackSession
         super.init()
     }
 
@@ -933,10 +1016,14 @@ final class BackgroundHTTPDownloadCoordinator: NSObject, URLSessionDownloadDeleg
         var attachedPairs: [(TaskMetadata, URLSessionTask)] = []
 
         for metadata in metadataList where jobIDs.contains(metadata.jobID) {
-            if let task = tasks.first(where: { task in
-                task.taskDescription == metadata.jobID.uuidString
-                    || task.taskIdentifier == metadata.taskIdentifier
-            }) {
+            if let task = tasks.first(where: { taskMatchesMetadata($0, metadata: metadata) }) {
+                if task.taskIdentifier != metadata.taskIdentifier {
+                    replaceMetadataTaskIdentifier(
+                        jobID: metadata.jobID,
+                        oldTaskIdentifier: metadata.taskIdentifier,
+                        newTaskIdentifier: task.taskIdentifier
+                    )
+                }
                 attachedPairs.append((metadata, task))
             }
         }
@@ -957,9 +1044,8 @@ final class BackgroundHTTPDownloadCoordinator: NSObject, URLSessionDownloadDeleg
     func cancel(jobID: UUID) async {
         let tasks = await session.allTasks
         let metadataList = loadMetadata().filter { $0.jobID == jobID }
-        let metadataTaskIDs = Set(metadataList.map(\.taskIdentifier))
 
-        for task in tasks where task.taskDescription == jobID.uuidString || metadataTaskIDs.contains(task.taskIdentifier) {
+        for task in tasks where taskMatchesJob(task, jobID: jobID, metadataList: metadataList) {
             task.cancel()
         }
 
@@ -974,9 +1060,8 @@ final class BackgroundHTTPDownloadCoordinator: NSObject, URLSessionDownloadDeleg
     func pause(jobID: UUID) async -> Bool {
         let tasks = await session.allTasks
         let metadataList = loadMetadata().filter { $0.jobID == jobID }
-        let metadataTaskIDs = Set(metadataList.map(\.taskIdentifier))
         let matchedTasks = tasks.compactMap { task -> URLSessionDownloadTask? in
-            guard task.taskDescription == jobID.uuidString || metadataTaskIDs.contains(task.taskIdentifier) else {
+            guard taskMatchesJob(task, jobID: jobID, metadataList: metadataList) else {
                 return nil
             }
             return task as? URLSessionDownloadTask
@@ -990,7 +1075,7 @@ final class BackgroundHTTPDownloadCoordinator: NSObject, URLSessionDownloadDeleg
 
         for task in matchedTasks {
             let resumeData = await cancelByProducingResumeData(task)
-            let metadata = metadataList.first { $0.taskIdentifier == task.taskIdentifier }
+            let metadata = metadata(for: task, metadataList: metadataList)
             if let resumeData,
                let metadata {
                 resumeStore.saveResumeData(
@@ -1003,7 +1088,11 @@ final class BackgroundHTTPDownloadCoordinator: NSObject, URLSessionDownloadDeleg
                     totalBytes: normalizedTotalBytes(task.countOfBytesExpectedToReceive, fallback: metadata.format.fileSizeApprox)
                 )
             }
-            removeMetadata(taskIdentifier: task.taskIdentifier)
+            if let metadata {
+                removeMetadata(taskIdentifier: metadata.taskIdentifier)
+            } else {
+                removeMetadata(taskIdentifier: task.taskIdentifier)
+            }
         }
 
         return true
@@ -1030,10 +1119,9 @@ final class BackgroundHTTPDownloadCoordinator: NSObject, URLSessionDownloadDeleg
         _ = session
     }
 
-    func drainDetachedCompletions() -> [(UUID, DownloadedAsset)] {
+    func pendingDetachedCompletions() -> [(UUID, DownloadedAsset)] {
         lock.lock()
         let completions = loadDetachedCompletions()
-        saveDetachedCompletions([])
         lock.unlock()
         return completions.map { ($0.jobID, $0.asset) }
     }
@@ -1142,7 +1230,7 @@ final class BackgroundHTTPDownloadCoordinator: NSObject, URLSessionDownloadDeleg
         }
         lock.unlock()
 
-        guard let metadata = metadata(for: taskIdentifier) else {
+        guard let metadata = metadata(for: downloadTask) else {
             return
         }
         Task {
@@ -1348,7 +1436,11 @@ final class BackgroundHTTPDownloadCoordinator: NSObject, URLSessionDownloadDeleg
 
         guard let activeDownload else {
             if error != nil {
-                removeMetadata(taskIdentifier: taskIdentifier)
+                if let metadata = metadata(for: task) {
+                    removeMetadata(taskIdentifier: metadata.taskIdentifier)
+                } else {
+                    removeMetadata(taskIdentifier: taskIdentifier)
+                }
             }
             return
         }
@@ -1425,7 +1517,7 @@ final class BackgroundHTTPDownloadCoordinator: NSObject, URLSessionDownloadDeleg
             message: existingBytes > 0 ? "Resume data failed; using HTTP Range" : "Resume data failed; restarting file download"
         ))
 
-        let (bytes, response) = try await URLSession.shared.bytes(for: request)
+        let (bytes, response) = try await rangeFallbackSession.bytes(for: request)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw SaveXError.invalidResponse("Range fallback response was not HTTP")
         }
@@ -1440,7 +1532,18 @@ final class BackgroundHTTPDownloadCoordinator: NSObject, URLSessionDownloadDeleg
             )
         }
 
-        if existingBytes > 0, httpResponse.statusCode != 206 {
+        if existingBytes > 0, httpResponse.statusCode == 206 {
+            let contentRange = parsedContentRange(httpResponse.value(forHTTPHeaderField: "Content-Range"))
+            if isValidRangeResponse(contentRange, expectedStart: existingBytes, expectedTotal: state?.totalBytes) {
+                // Keep the existing partial file and append the requested suffix.
+            } else if contentRange?.start == 0 {
+                try? fileManager.removeItem(at: partialURL)
+                fileManager.createFile(atPath: partialURL.path, contents: nil)
+                existingBytes = 0
+            } else {
+                throw SaveXError.invalidResponse("Range fallback returned an unexpected Content-Range")
+            }
+        } else if existingBytes > 0 {
             try? fileManager.removeItem(at: partialURL)
             fileManager.createFile(atPath: partialURL.path, contents: nil)
             existingBytes = 0
@@ -1547,15 +1650,48 @@ final class BackgroundHTTPDownloadCoordinator: NSObject, URLSessionDownloadDeleg
     }
 
     private func totalBytesForRangeResponse(_ response: HTTPURLResponse, alreadyDownloaded: Int64) -> Int64? {
-        if let contentRange = response.value(forHTTPHeaderField: "Content-Range"),
-           let totalText = contentRange.split(separator: "/").last,
-           let total = Int64(totalText) {
-            return total
+        if let range = parsedContentRange(response.value(forHTTPHeaderField: "Content-Range")) {
+            return range.total
         }
         if response.expectedContentLength > 0 {
             return alreadyDownloaded + response.expectedContentLength
         }
         return nil
+    }
+
+    private func isValidRangeResponse(
+        _ range: (start: Int64, end: Int64, total: Int64)?,
+        expectedStart: Int64,
+        expectedTotal: Int64?
+    ) -> Bool {
+        guard let range else {
+            return false
+        }
+        guard range.start == expectedStart else {
+            return false
+        }
+        if let expectedTotal, range.total != expectedTotal {
+            return false
+        }
+        return range.end >= range.start
+    }
+
+    private func parsedContentRange(_ value: String?) -> (start: Int64, end: Int64, total: Int64)? {
+        guard let value else {
+            return nil
+        }
+        let pattern = #"^bytes\s+(\d+)-(\d+)/(\d+)$"#
+        guard let expression = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]),
+              let match = expression.firstMatch(in: value, range: NSRange(value.startIndex..<value.endIndex, in: value)),
+              let startRange = Range(match.range(at: 1), in: value),
+              let endRange = Range(match.range(at: 2), in: value),
+              let totalRange = Range(match.range(at: 3), in: value),
+              let start = Int64(value[startRange]),
+              let end = Int64(value[endRange]),
+              let total = Int64(value[totalRange]) else {
+            return nil
+        }
+        return (start, end, total)
     }
 
     private func removePausingJobID(_ jobID: UUID) -> Bool {
@@ -1577,8 +1713,7 @@ final class BackgroundHTTPDownloadCoordinator: NSObject, URLSessionDownloadDeleg
     }
 
     private func finishDetachedDownload(downloadTask: URLSessionDownloadTask, location: URL) {
-        let taskIdentifier = downloadTask.taskIdentifier
-        guard let metadata = metadata(for: taskIdentifier) else {
+        guard let metadata = metadata(for: downloadTask) else {
             return
         }
 
@@ -1617,9 +1752,9 @@ final class BackgroundHTTPDownloadCoordinator: NSObject, URLSessionDownloadDeleg
             resumeStore.clear(jobID: metadata.jobID)
             appendDetachedCompletion(DetachedCompletion(jobID: metadata.jobID, asset: asset))
             notifyDetachedCompletion(jobID: metadata.jobID, asset: asset)
-            removeMetadata(taskIdentifier: taskIdentifier)
+            removeMetadata(taskIdentifier: metadata.taskIdentifier)
         } catch {
-            removeMetadata(taskIdentifier: taskIdentifier)
+            removeMetadata(taskIdentifier: metadata.taskIdentifier)
         }
     }
 
@@ -1644,16 +1779,72 @@ final class BackgroundHTTPDownloadCoordinator: NSObject, URLSessionDownloadDeleg
         lock.lock()
         var metadataList = loadMetadata()
         metadataList.removeAll { $0.taskIdentifier == metadata.taskIdentifier }
+        metadataList.removeAll { $0.jobID == metadata.jobID }
         metadataList.append(metadata)
         saveMetadata(metadataList)
         lock.unlock()
     }
 
-    private func metadata(for taskIdentifier: Int) -> TaskMetadata? {
+    private func replaceMetadataTaskIdentifier(
+        jobID: UUID,
+        oldTaskIdentifier: Int,
+        newTaskIdentifier: Int
+    ) {
         lock.lock()
-        let metadata = loadMetadata().first { $0.taskIdentifier == taskIdentifier }
+        var metadataList = loadMetadata()
+        guard let index = metadataList.firstIndex(where: { $0.jobID == jobID || $0.taskIdentifier == oldTaskIdentifier }) else {
+            lock.unlock()
+            return
+        }
+        let metadata = metadataList[index]
+        metadataList.removeAll { $0.jobID == metadata.jobID || $0.taskIdentifier == oldTaskIdentifier || $0.taskIdentifier == newTaskIdentifier }
+        metadataList.append(TaskMetadata(
+            taskIdentifier: newTaskIdentifier,
+            jobID: metadata.jobID,
+            format: metadata.format,
+            tweetID: metadata.tweetID,
+            title: metadata.title,
+            destinationDirectoryPath: metadata.destinationDirectoryPath
+        ))
+        saveMetadata(metadataList)
+        lock.unlock()
+    }
+
+    private func metadata(for task: URLSessionTask) -> TaskMetadata? {
+        lock.lock()
+        let metadata = metadata(for: task, metadataList: loadMetadata())
         lock.unlock()
         return metadata
+    }
+
+    private func metadata(for task: URLSessionTask, metadataList: [TaskMetadata]) -> TaskMetadata? {
+        if let jobID = jobID(from: task.taskDescription),
+           let metadata = metadataList.first(where: { $0.jobID == jobID }) {
+            return metadata
+        }
+        return metadataList.first { $0.taskIdentifier == task.taskIdentifier }
+    }
+
+    private func taskMatchesJob(
+        _ task: URLSessionTask,
+        jobID: UUID,
+        metadataList: [TaskMetadata]
+    ) -> Bool {
+        if task.taskDescription == jobID.uuidString {
+            return true
+        }
+        return metadataList.contains { $0.jobID == jobID && $0.taskIdentifier == task.taskIdentifier }
+    }
+
+    private func taskMatchesMetadata(_ task: URLSessionTask, metadata: TaskMetadata) -> Bool {
+        task.taskDescription == metadata.jobID.uuidString || task.taskIdentifier == metadata.taskIdentifier
+    }
+
+    private func jobID(from taskDescription: String?) -> UUID? {
+        guard let taskDescription else {
+            return nil
+        }
+        return UUID(uuidString: taskDescription)
     }
 
     private func removeMetadata(taskIdentifier: Int) {
@@ -1726,42 +1917,17 @@ final class BackgroundHTTPDownloadCoordinator: NSObject, URLSessionDownloadDeleg
     }
 
     private func uniqueDestinationURL(in directory: URL, baseName: String, ext: String) -> URL {
-        var candidate = directory.appendingPathComponent("\(baseName).\(ext)", isDirectory: false)
-        var index = 2
-        while fileManager.fileExists(atPath: candidate.path) {
-            candidate = directory.appendingPathComponent("\(baseName)-\(index).\(ext)", isDirectory: false)
-            index += 1
+        DownloadFileNaming.uniqueDestinationURL(in: directory, baseName: baseName, ext: ext) { path in
+            fileManager.fileExists(atPath: path)
         }
-        return candidate
     }
 
     private func makeFilename(tweetID: String, title: String) -> String {
-        let allowed = CharacterSet.alphanumerics.union(.whitespaces).union(CharacterSet(charactersIn: "-_"))
-        let sanitizedScalars = title.unicodeScalars.map { allowed.contains($0) ? Character($0) : Character(" ") }
-        let sanitized = String(sanitizedScalars)
-            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let prefix = sanitized.isEmpty ? "tweet-\(tweetID)" : sanitized
-        return cleanedTitle(prefix, limit: 60).replacingOccurrences(of: " ", with: "-")
+        DownloadFileNaming.makeFilename(tweetID: tweetID, title: title)
     }
 
     private func fileExtension(for format: MediaFormat, mimeType: String?) -> String {
-        switch format.container {
-        case .mp4:
-            return "mp4"
-        case .m3u8:
-            return "m3u8"
-        case .ts:
-            return "ts"
-        case .unknown:
-            if let mimeType, mimeType.contains("mp4") {
-                return "mp4"
-            }
-            if let ext = format.url.pathExtension.split(separator: "?").first, !ext.isEmpty {
-                return String(ext)
-            }
-            return "bin"
-        }
+        DownloadFileNaming.fileExtension(for: format, mimeType: mimeType)
     }
 }
 
@@ -1915,42 +2081,17 @@ actor HTTPFileDownloader {
     }
 
     private func uniqueDestinationURL(in directory: URL, baseName: String, ext: String) -> URL {
-        var candidate = directory.appendingPathComponent("\(baseName).\(ext)", isDirectory: false)
-        var index = 2
-        while fileManager.fileExists(atPath: candidate.path) {
-            candidate = directory.appendingPathComponent("\(baseName)-\(index).\(ext)", isDirectory: false)
-            index += 1
+        DownloadFileNaming.uniqueDestinationURL(in: directory, baseName: baseName, ext: ext) { path in
+            fileManager.fileExists(atPath: path)
         }
-        return candidate
     }
 
     private func makeFilename(tweetID: String, title: String) -> String {
-        let allowed = CharacterSet.alphanumerics.union(.whitespaces).union(CharacterSet(charactersIn: "-_"))
-        let sanitizedScalars = title.unicodeScalars.map { allowed.contains($0) ? Character($0) : Character(" ") }
-        let sanitized = String(sanitizedScalars)
-            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        let prefix = sanitized.isEmpty ? "tweet-\(tweetID)" : sanitized
-        return cleanedTitle(prefix, limit: 60).replacingOccurrences(of: " ", with: "-")
+        DownloadFileNaming.makeFilename(tweetID: tweetID, title: title)
     }
 
     private func fileExtension(for format: MediaFormat, mimeType: String?) -> String {
-        switch format.container {
-        case .mp4:
-            return "mp4"
-        case .m3u8:
-            return "m3u8"
-        case .ts:
-            return "ts"
-        case .unknown:
-            if let mimeType, mimeType.contains("mp4") {
-                return "mp4"
-            }
-            if let ext = format.url.pathExtension.split(separator: "?").first, !ext.isEmpty {
-                return String(ext)
-            }
-            return "bin"
-        }
+        DownloadFileNaming.fileExtension(for: format, mimeType: mimeType)
     }
 
     private func expectedContentLength(from response: HTTPURLResponse, fallback: Int?) -> Int64? {

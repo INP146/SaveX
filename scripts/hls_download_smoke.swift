@@ -59,6 +59,7 @@ struct HLSDownloadSmokeMain {
             try await testHLSDownload()
             try await testHLSExportFailure()
             try await testHLSResumeReusesCompletedSegments()
+            try await testHLSCancellationDuringExportDoesNotLeaveOutput()
             print("hls download smoke passed")
         } catch {
             print("FAILED: \(error.localizedDescription)")
@@ -310,6 +311,78 @@ struct HLSDownloadSmokeMain {
         try expect(MockHLSURLProtocol.requestCounts[firstSegmentURL] == nil, "second run should not request segment 1")
         try expect(MockHLSURLProtocol.requestCounts[secondSegmentURL] == nil, "second run should not request segment 2")
     }
+
+    private static func testHLSCancellationDuringExportDoesNotLeaveOutput() async throws {
+        let masterURL = URL(string: "https://video.example.test/cancel-master.m3u8")!
+        let mediaURL = URL(string: "https://video.example.test/cancel/index.m3u8")!
+        let segmentURL = URL(string: "https://video.example.test/cancel/segment-1.ts")!
+
+        MockHLSURLProtocol.responses = [
+            masterURL: (200, Data("""
+            #EXTM3U
+            #EXT-X-STREAM-INF:BANDWIDTH=1000000,RESOLUTION=640x360
+            cancel/index.m3u8
+            """.utf8), "application/vnd.apple.mpegurl"),
+            mediaURL: (200, Data("""
+            #EXTM3U
+            #EXTINF:1.0,
+            segment-1.ts
+            #EXT-X-ENDLIST
+            """.utf8), "application/vnd.apple.mpegurl"),
+            segmentURL: (200, Data([0x47, 0x51]), "video/MP2T"),
+        ]
+
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockHLSURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        let exporter = CancellableHLSExporter()
+        let downloader = HLSMediaDownloader(session: session, exporter: exporter)
+        let destinationDirectory = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+            .appendingPathComponent("SaveXHLSCancelSmoke-\(UUID().uuidString)", isDirectory: true)
+        defer {
+            try? FileManager.default.removeItem(at: destinationDirectory)
+        }
+
+        let format = MediaFormat(
+            id: "fixture-hls-cancel",
+            url: masterURL,
+            formatID: "hls-cancel",
+            transport: .m3u8Native,
+            container: .mp4,
+            bitrate: nil,
+            width: nil,
+            height: nil,
+            fileSizeApprox: nil,
+            videoCodec: nil,
+            audioCodec: nil,
+            httpHeaders: [:]
+        )
+
+        let task = Task {
+            try await downloader.download(
+                jobID: UUID(),
+                format: format,
+                tweetID: "1234567893",
+                title: "Fixture HLS Cancel",
+                destinationDirectory: destinationDirectory
+            )
+        }
+
+        await exporter.waitUntilStarted()
+        task.cancel()
+
+        do {
+            _ = try await task.value
+            throw HLSDownloadSmokeError.failed("cancelled HLS export should not complete")
+        } catch is CancellationError {
+        }
+
+        let contents = try FileManager.default.contentsOfDirectory(
+            at: destinationDirectory,
+            includingPropertiesForKeys: nil
+        )
+        try expect(!contents.contains { $0.pathExtension == "mp4" }, "cancelled export should not leave a final MP4")
+    }
 }
 
 private final class MockHLSExporter: HLSMediaExporting, @unchecked Sendable {
@@ -327,6 +400,28 @@ private final class MockHLSExporter: HLSMediaExporting, @unchecked Sendable {
         if let error {
             throw error
         }
+        try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
+    }
+}
+
+private actor CancellableHLSExporter: HLSMediaExporting {
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var didStart = false
+
+    func waitUntilStarted() async {
+        if didStart {
+            return
+        }
+        await withCheckedContinuation { continuation in
+            self.continuation = continuation
+        }
+    }
+
+    func exportMP4(from sourceURL: URL, to destinationURL: URL) async throws {
+        didStart = true
+        continuation?.resume()
+        continuation = nil
+        try await Task.sleep(nanoseconds: 30_000_000_000)
         try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
     }
 }

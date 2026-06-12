@@ -8,6 +8,7 @@ struct AppContainer {
     let formatSelector: FormatSelector
     let downloadEngine: DownloadEngine
     let photoLibraryWriter: PhotoLibraryWriter
+    let networkPermissionRequester: NetworkPermissionRequester
 
     init() {
         let authProvider = DefaultTwitterAuthProvider(authToken: nil, csrfToken: nil)
@@ -25,5 +26,6 @@ struct AppContainer {
             selector: formatSelector
         )
         self.photoLibraryWriter = PhotoLibraryWriter()
+        self.networkPermissionRequester = NetworkPermissionRequester()
     }
 }

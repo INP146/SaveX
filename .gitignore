@@ -5,5 +5,9 @@ yt-dlp/
 # Local build and release artifacts.
 build/
 
+# Xcode user state.
+xcuserdata/
+*.xcuserstate
+
 # macOS metadata
 .DS_Store

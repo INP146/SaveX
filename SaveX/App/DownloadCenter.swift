@@ -141,6 +141,8 @@ final class DownloadCenter: ObservableObject {
     private let shouldPersistJobs: Bool
     private var jobPreferences: [UUID: FormatSelectionPreference]
     private var downloadTasks: [UUID: Task<Void, Never>] = [:]
+    private var lastProgressPersistenceAt: [UUID: Date] = [:]
+    private static let progressPersistenceInterval: TimeInterval = 10
 
     init(
         container: AppContainer,
@@ -198,6 +200,18 @@ final class DownloadCenter: ObservableObject {
         await observeRestoredBackgroundTasks()
         await restartInterruptedBackgroundFailures()
 
+        let networkResult = await container.networkPermissionRequester.requestAccess()
+        banner = DownloadBanner(
+            text: networkResult.isReady ? "Network access ready" : "Allow network access to download videos",
+            kind: networkResult.isReady ? .info : .error
+        )
+        appendLog(
+            kind: networkResult.isReady ? .success : .warning,
+            title: "Network capability",
+            message: networkResult.message,
+            tweetID: nil
+        )
+
         let isAllowed = await container.photoLibraryWriter.requestAddOnlyAccess()
         banner = DownloadBanner(
             text: isAllowed ? "Photos access ready" : "Allow Photos access to save videos to your album",
@@ -254,7 +268,7 @@ final class DownloadCenter: ObservableObject {
     }
 
     private func consumeDetachedBackgroundCompletions() async {
-        let completions = BackgroundHTTPDownloadCoordinator.shared.drainDetachedCompletions()
+        let completions = BackgroundHTTPDownloadCoordinator.shared.pendingDetachedCompletions()
         for (jobID, asset) in completions {
             await handleDetachedBackgroundCompletion(jobID: jobID, asset: asset)
         }
@@ -262,7 +276,50 @@ final class DownloadCenter: ObservableObject {
 
     private func handleDetachedBackgroundCompletion(jobID: UUID, asset: DownloadedAsset) async {
         guard let job = jobs.first(where: { $0.id == jobID }) else {
+            let didRecord = recordRecoveredLibraryItem(asset: asset)
+            let didDiscard = didRecord ? false : discardRecoveredAsset(asset)
+            banner = DownloadBanner(
+                text: didRecord
+                    ? "Recovered background download \(asset.localFileURL.lastPathComponent)"
+                    : didDiscard
+                        ? "Background download recovery failed; discarded \(asset.localFileURL.lastPathComponent)"
+                        : "Background download recovery failed, and cleanup failed",
+                kind: didRecord ? .success : .error
+            )
+            appendLog(
+                kind: didRecord ? .warning : .error,
+                title: didRecord
+                    ? "Recovered orphan download"
+                    : didDiscard
+                        ? "Discarded orphan download"
+                        : "Orphan cleanup failed",
+                message: asset.localFileURL.lastPathComponent,
+                jobID: jobID,
+                tweetID: asset.sourceTweetID
+            )
             BackgroundHTTPDownloadCoordinator.shared.acknowledgeDetachedCompletion(jobID: jobID)
+            return
+        }
+
+        guard recordLibraryItem(asset: asset, request: job.request) else {
+            updateJob(id: jobID) { job in
+                applyDownloadedAsset(asset, to: &job)
+                job.phase = .ready
+                job.progress = 1
+                job.errorMessage = "Library save failed"
+                job.progressMessage = "Downloaded, but Library save failed"
+            }
+            banner = DownloadBanner(
+                text: "Downloaded \(asset.localFileURL.lastPathComponent), but Library save failed",
+                kind: .error
+            )
+            appendLog(
+                kind: .warning,
+                title: "Background Library save failed",
+                message: asset.localFileURL.lastPathComponent,
+                jobID: jobID,
+                tweetID: job.request.tweetID
+            )
             return
         }
 
@@ -281,7 +338,6 @@ final class DownloadCenter: ObservableObject {
             job.progressMessage = nil
             job.errorMessage = nil
         }
-        recordLibraryItem(asset: asset, request: job.request)
 
         do {
             try await container.photoLibraryWriter.saveVideoToLibrary(at: asset.localFileURL)
@@ -301,6 +357,7 @@ final class DownloadCenter: ObservableObject {
     func retryJob(_ job: DownloadJob) {
         let preference = jobPreferences[job.id] ?? .ytDLPCompatible
         jobPreferences[job.id] = preference
+        lastProgressPersistenceAt.removeValue(forKey: job.id)
         downloadTasks[job.id]?.cancel()
         downloadTasks.removeValue(forKey: job.id)
 
@@ -325,16 +382,22 @@ final class DownloadCenter: ObservableObject {
         }
 
         updateJob(id: job.id) { storedJob in
-            storedJob.phase = .paused
-            storedJob.progressMessage = "Paused"
+            storedJob.progressMessage = "Pausing"
             storedJob.speedBytesPerSecond = nil
             storedJob.etaSeconds = nil
         }
-        appendLog(kind: .info, title: "Paused", message: "Paused download task.", jobID: job.id, tweetID: job.request.tweetID)
+        appendLog(kind: .info, title: "Pause requested", message: "Requesting a resumable pause.", jobID: job.id, tweetID: job.request.tweetID)
 
-        downloadTasks[job.id]?.cancel()
-        Task {
-            _ = await BackgroundHTTPDownloadCoordinator.shared.pause(jobID: job.id)
+        Task { @MainActor [weak self] in
+            guard let self else {
+                return
+            }
+            let didPauseBackgroundTask = await BackgroundHTTPDownloadCoordinator.shared.pause(jobID: job.id)
+            if didPauseBackgroundTask {
+                self.markJobPausedIfStillActive(jobID: job.id, request: job.request)
+                return
+            }
+            self.downloadTasks[job.id]?.cancel()
         }
     }
 
@@ -401,11 +464,27 @@ final class DownloadCenter: ObservableObject {
         jobs.first(where: { $0.id == id })?.phase == .paused
     }
 
+    private func markJobPausedIfStillActive(jobID: UUID, request: TweetRequest) {
+        guard let job = jobs.first(where: { $0.id == jobID }),
+              !job.phase.isTerminal,
+              job.phase != .paused else {
+            return
+        }
+        updateJob(id: jobID) { job in
+            job.phase = .paused
+            job.progressMessage = "Paused"
+            job.speedBytesPerSecond = nil
+            job.etaSeconds = nil
+        }
+        appendLog(kind: .info, title: "Paused", message: "Download can be continued later.", jobID: jobID, tweetID: request.tweetID)
+    }
+
     func deleteJob(_ job: DownloadJob) {
         downloadTasks[job.id]?.cancel()
         downloadTasks.removeValue(forKey: job.id)
         jobs.removeAll { $0.id == job.id }
         jobPreferences.removeValue(forKey: job.id)
+        lastProgressPersistenceAt.removeValue(forKey: job.id)
         if shouldPersistJobs {
             jobStore.remove(jobID: job.id)
         }
@@ -496,26 +575,43 @@ final class DownloadCenter: ObservableObject {
                     tweetID: request.tweetID
                 )
             }
+            guard jobs.contains(where: { $0.id == jobID }) else {
+                return
+            }
+
+            guard recordLibraryItem(asset: asset, request: request) else {
+                updateJob(id: jobID) { job in
+                    applyDownloadedAsset(asset, to: &job)
+                    job.phase = .ready
+                    job.progress = 1
+                    job.errorMessage = "Library save failed"
+                    job.progressMessage = "Downloaded, but Library save failed"
+                }
+                banner = DownloadBanner(
+                    text: "Downloaded \(asset.localFileURL.lastPathComponent), but Library save failed",
+                    kind: .error
+                )
+                appendLog(
+                    kind: .warning,
+                    title: "Library save failed",
+                    message: asset.localFileURL.lastPathComponent,
+                    jobID: jobID,
+                    tweetID: request.tweetID
+                )
+                downloadTasks.removeValue(forKey: jobID)
+                return
+            }
 
             updateJob(id: jobID) { job in
+                applyDownloadedAsset(asset, to: &job)
                 job.phase = .completed
                 job.progress = 1
-                job.displayTitle = asset.localFileURL.deletingPathExtension().lastPathComponent
-                job.selectedFormatID = asset.format.formatID
-                job.outputFilename = asset.localFileURL.lastPathComponent
-                job.localFileURL = asset.localFileURL
-                job.savedFileSize = asset.fileSize
-                job.downloadedBytes = asset.fileSize
-                job.totalBytes = asset.fileSize
-                job.speedBytesPerSecond = nil
-                job.etaSeconds = nil
                 if job.totalSegmentCount != nil {
                     job.completedSegmentCount = job.totalSegmentCount
                 }
                 job.progressMessage = nil
                 job.errorMessage = nil
             }
-            recordLibraryItem(asset: asset, request: request)
             applyProgressEvent(
                 jobID: jobID,
                 event: DownloadProgressEvent(
@@ -551,14 +647,13 @@ final class DownloadCenter: ObservableObject {
             }
             downloadTasks.removeValue(forKey: jobID)
         } catch {
+            guard jobs.contains(where: { $0.id == jobID }) else {
+                downloadTasks.removeValue(forKey: jobID)
+                return
+            }
             if Self.isPauseError(error) || isPausedJob(id: jobID) {
-                updateJob(id: jobID) { job in
-                    job.phase = .paused
-                    job.progressMessage = "Paused"
-                    job.speedBytesPerSecond = nil
-                    job.etaSeconds = nil
-                }
-                appendLog(kind: .info, title: "Paused", message: "Download can be continued later.", jobID: jobID, tweetID: request.tweetID)
+                downloadTasks.removeValue(forKey: jobID)
+                markJobPausedIfStillActive(jobID: jobID, request: request)
                 return
             }
             downloadTasks.removeValue(forKey: jobID)
@@ -576,7 +671,7 @@ final class DownloadCenter: ObservableObject {
         jobID: UUID,
         event: DownloadProgressEvent
     ) {
-        updateJob(id: jobID) { job in
+        updateJob(id: jobID, persist: shouldPersistProgressEvent(jobID: jobID, event: event)) { job in
             job.phase = event.phase
             job.progress = event.progress
             if let formatID = event.formatID {
@@ -600,12 +695,30 @@ final class DownloadCenter: ObservableObject {
         }
     }
 
-    private func updateJob(id: UUID, mutate: (inout DownloadJob) -> Void) {
+    private func updateJob(
+        id: UUID,
+        persist: Bool = true,
+        mutate: (inout DownloadJob) -> Void
+    ) {
         guard let index = jobs.firstIndex(where: { $0.id == id }) else {
             return
         }
         mutate(&jobs[index])
-        persistJob(jobs[index])
+        if persist {
+            persistJob(jobs[index])
+        }
+    }
+
+    private func applyDownloadedAsset(_ asset: DownloadedAsset, to job: inout DownloadJob) {
+        job.displayTitle = asset.localFileURL.deletingPathExtension().lastPathComponent
+        job.selectedFormatID = asset.format.formatID
+        job.outputFilename = asset.localFileURL.lastPathComponent
+        job.localFileURL = asset.localFileURL
+        job.savedFileSize = asset.fileSize
+        job.downloadedBytes = asset.fileSize
+        job.totalBytes = asset.fileSize
+        job.speedBytesPerSecond = nil
+        job.etaSeconds = nil
     }
 
     private func persistJob(_ job: DownloadJob) {
@@ -615,12 +728,36 @@ final class DownloadCenter: ObservableObject {
         if job.phase == .completed {
             jobStore.remove(jobID: job.id)
             jobPreferences.removeValue(forKey: job.id)
+            lastProgressPersistenceAt.removeValue(forKey: job.id)
             return
         }
         guard let preference = jobPreferences[job.id] else {
             return
         }
         jobStore.upsert(DownloadJobRecord(job: job, preference: preference))
+    }
+
+    private func shouldPersistProgressEvent(
+        jobID: UUID,
+        event: DownloadProgressEvent
+    ) -> Bool {
+        switch event.kind {
+        case .phase, .export, .photoSave:
+            lastProgressPersistenceAt[jobID] = Date()
+            return true
+        case .fileTransfer, .hlsSegment:
+            if event.phase == .waitingForSystem {
+                lastProgressPersistenceAt[jobID] = Date()
+                return true
+            }
+            let now = Date()
+            guard let last = lastProgressPersistenceAt[jobID],
+                  now.timeIntervalSince(last) < Self.progressPersistenceInterval else {
+                lastProgressPersistenceAt[jobID] = now
+                return true
+            }
+            return false
+        }
     }
 
     func clearLogs() {
@@ -638,7 +775,7 @@ final class DownloadCenter: ObservableObject {
                 try fileManager.removeItem(at: url)
             }
             libraryItems.removeAll { $0.id == item.id }
-            persistLibraryItems()
+            _ = persistLibraryItems()
             banner = DownloadBanner(text: "Deleted \(item.fileName)", kind: .info)
             appendLog(kind: .info, title: "Deleted local file", message: item.fileName, tweetID: item.sourceTweetID)
         } catch {
@@ -673,8 +810,9 @@ final class DownloadCenter: ObservableObject {
         }
     }
 
-    private func recordLibraryItem(asset: DownloadedAsset, request: TweetRequest) {
-        let item = LocalLibraryItem(
+    @discardableResult
+    private func recordLibraryItem(asset: DownloadedAsset, request: TweetRequest) -> Bool {
+        recordLibraryItem(LocalLibraryItem(
             id: UUID(),
             createdAt: Date(),
             sourceTweetID: request.tweetID,
@@ -684,20 +822,64 @@ final class DownloadCenter: ObservableObject {
             fileName: asset.localFileURL.lastPathComponent,
             fileSize: asset.fileSize,
             responseMimeType: asset.responseMimeType
-        )
-
-        libraryItems.removeAll { $0.fileName == item.fileName }
-        libraryItems.insert(item, at: 0)
-        persistLibraryItems()
+        ))
     }
 
-    private func persistLibraryItems() {
+    @discardableResult
+    private func recordRecoveredLibraryItem(asset: DownloadedAsset) -> Bool {
+        recordLibraryItem(LocalLibraryItem(
+            id: UUID(),
+            createdAt: Date(),
+            sourceTweetID: asset.sourceTweetID,
+            sourceURLString: "",
+            title: asset.localFileURL.deletingPathExtension().lastPathComponent,
+            formatID: asset.format.formatID,
+            fileName: asset.localFileURL.lastPathComponent,
+            fileSize: asset.fileSize,
+            responseMimeType: asset.responseMimeType
+        ))
+    }
+
+    @discardableResult
+    private func discardRecoveredAsset(_ asset: DownloadedAsset) -> Bool {
+        do {
+            if fileManager.fileExists(atPath: asset.localFileURL.path) {
+                try fileManager.removeItem(at: asset.localFileURL)
+            }
+            return true
+        } catch {
+            appendLog(kind: .warning, title: "File cleanup failed", message: error.localizedDescription, tweetID: asset.sourceTweetID)
+            return false
+        }
+    }
+
+    @discardableResult
+    private func recordLibraryItem(_ item: LocalLibraryItem) -> Bool {
+        var updatedItems = libraryItems
+        updatedItems.removeAll { $0.fileName == item.fileName }
+        updatedItems.insert(item, at: 0)
+        guard persistLibraryItems(updatedItems) else {
+            return false
+        }
+        libraryItems = updatedItems
+        return true
+    }
+
+    @discardableResult
+    private func persistLibraryItems() -> Bool {
+        persistLibraryItems(libraryItems)
+    }
+
+    @discardableResult
+    private func persistLibraryItems(_ items: [LocalLibraryItem]) -> Bool {
         do {
             try fileManager.createDirectory(at: libraryDirectory, withIntermediateDirectories: true)
-            let data = try JSONEncoder.saveXLibraryEncoder.encode(libraryItems)
+            let data = try JSONEncoder.saveXLibraryEncoder.encode(items)
             try data.write(to: libraryManifestURL, options: .atomic)
+            return true
         } catch {
             appendLog(kind: .warning, title: "Library save failed", message: error.localizedDescription, tweetID: nil)
+            return false
         }
     }
 

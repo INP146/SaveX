@@ -24,15 +24,26 @@ struct TwitterMediaExtractor {
             loadVMAP: loadVMAP
         ))
 
-        if entries.isEmpty {
-            throw SaveXError.noVideoFound
-        }
-
         if let selectedMediaIndex = request.selectedMediaIndex {
-            guard selectedMediaIndex > 0, selectedMediaIndex <= entries.count else {
+            guard selectedMediaIndex > 0 else {
                 throw SaveXError.videoUnavailable(index: selectedMediaIndex)
             }
-            return [entries[selectedMediaIndex - 1]]
+            guard request.selectedMediaKind != .photo else {
+                throw SaveXError.mediaNotVideo(index: selectedMediaIndex)
+            }
+            if let entry = entries.first(where: { $0.sourceMediaIndex == selectedMediaIndex }) {
+                return [entry]
+            }
+            let hasMediaAtSelectedIndex = collectMedia(from: status).contains {
+                jsonInt($0["source_media_index"]) == selectedMediaIndex
+            }
+            throw hasMediaAtSelectedIndex
+                ? SaveXError.mediaNotVideo(index: selectedMediaIndex)
+                : SaveXError.videoUnavailable(index: selectedMediaIndex)
+        }
+
+        if entries.isEmpty {
+            throw SaveXError.noVideoFound
         }
 
         return entries.enumerated().map { index, entry in
@@ -53,6 +64,7 @@ struct TwitterMediaExtractor {
                 likeCount: entry.likeCount,
                 repostCount: entry.repostCount,
                 commentCount: entry.commentCount,
+                sourceMediaIndex: entry.sourceMediaIndex,
                 ageLimit: entry.ageLimit,
                 tags: entry.tags,
                 duration: entry.duration,
@@ -135,6 +147,7 @@ struct TwitterMediaExtractor {
             likeCount: jsonInt(status["favorite_count"]),
             repostCount: jsonInt(status["retweet_count"]),
             commentCount: jsonInt(status["reply_count"]),
+            sourceMediaIndex: nil,
             ageLimit: jsonBool(status["possibly_sensitive"]) == true ? 18 : 0,
             tags: extractTags(status),
             duration: nil,
@@ -148,6 +161,7 @@ struct TwitterMediaExtractor {
 
     private func makeEntry(from media: JSONDictionary, base: TweetMediaInfo) -> TweetMediaInfo {
         let mediaID = jsonString(media["id_str"]) ?? jsonString(media["id"]) ?? base.id
+        let sourceMediaIndex = jsonInt(media["source_media_index"])
         let extractedFormats = (jsonArray(jsonValue(in: media, path: ["video_info", "variants"])) ?? [])
             .compactMap(jsonDictionary)
             .flatMap { extractFormats(from: $0, tweetID: base.displayID) }
@@ -170,6 +184,7 @@ struct TwitterMediaExtractor {
             likeCount: base.likeCount,
             repostCount: base.repostCount,
             commentCount: base.commentCount,
+            sourceMediaIndex: sourceMediaIndex,
             ageLimit: base.ageLimit,
             tags: base.tags,
             duration: jsonDouble(jsonValue(in: media, path: ["video_info", "duration_millis"])).map { $0 / 1000 },
@@ -182,13 +197,23 @@ struct TwitterMediaExtractor {
     }
 
     private func collectVideoMedia(from status: JSONDictionary) -> [JSONDictionary] {
+        collectMedia(from: status).filter {
+            jsonString($0["type"]) != "photo"
+        }
+    }
+
+    private func collectMedia(from status: JSONDictionary) -> [JSONDictionary] {
         let containers = [status, jsonDictionary(status["quoted_status"])]
         return containers
             .compactMap { $0 }
             .flatMap { container -> [JSONDictionary] in
                 let media = jsonArray(jsonValue(in: container, path: ["extended_entities", "media"])) ?? []
-                return media.compactMap(jsonDictionary).filter {
-                    jsonString($0["type"]) != "photo"
+                return media.enumerated().compactMap { index, item in
+                    guard var dictionary = jsonDictionary(item) else {
+                        return nil
+                    }
+                    dictionary["source_media_index"] = index + 1
+                    return dictionary
                 }
             }
     }
@@ -365,6 +390,7 @@ struct CardMediaExtractor {
             likeCount: base.likeCount,
             repostCount: base.repostCount,
             commentCount: base.commentCount,
+            sourceMediaIndex: nil,
             ageLimit: base.ageLimit,
             tags: base.tags,
             duration: duration,

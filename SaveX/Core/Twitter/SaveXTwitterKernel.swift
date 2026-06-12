@@ -70,7 +70,7 @@ struct TwitterAPIConfiguration {
 }
 
 struct TwitterURLParser {
-    private static let pattern = #"https?://(?:(?:www|m(?:obile)?)\.)?(?:(?:twitter|x)\.com|twitter3e4tixl4xyajtrzo62zg5vztmjuricljdp2c5kshju4avyoid\.onion)/(?:(?:i/web|[^/]+)/status|statuses)/(?<id>\d+)(?:/(?:video|photo)/(?<index>\d+))?"#
+    private static let pattern = #"https?://(?:(?:www|m(?:obile)?)\.)?(?:(?:twitter|x)\.com|twitter3e4tixl4xyajtrzo62zg5vztmjuricljdp2c5kshju4avyoid\.onion)/(?:(?:i/web|[^/]+)/status|statuses)/(?<id>\d+)(?:/(?<kind>video|photo)/(?<index>\d+))?"#
     private let expression = try! NSRegularExpression(pattern: Self.pattern, options: [.caseInsensitive])
 
     func parse(_ rawURL: String) throws -> TweetRequest {
@@ -88,13 +88,17 @@ struct TwitterURLParser {
 
         let tweetID = Range(match.range(withName: "id"), in: rawURL).map { String(rawURL[$0]) } ?? ""
         let selectedMediaIndex = Range(match.range(withName: "index"), in: rawURL).flatMap { Int(rawURL[$0]) }
+        let selectedMediaKind = Range(match.range(withName: "kind"), in: rawURL)
+            .map { String(rawURL[$0]).lowercased() }
+            .flatMap(TweetMediaSelectionKind.init(rawValue:))
         let screenName = url.pathComponents.dropFirst().first
 
         return TweetRequest(
             sourceURL: url,
             tweetID: tweetID,
             screenName: screenName == "i" ? nil : screenName,
-            selectedMediaIndex: selectedMediaIndex
+            selectedMediaIndex: selectedMediaIndex,
+            selectedMediaKind: selectedMediaKind
         )
     }
 }

@@ -37,6 +37,7 @@ struct SaveXKernelFixtureSmokeMain {
         try expect(request.tweetID == "1234567890", "tweetID was not parsed")
         try expect(request.screenName == "demo", "screen name was not parsed")
         try expect(request.selectedMediaIndex == 2, "selected media index was not parsed")
+        try expect(request.selectedMediaKind == .video, "selected media kind was not parsed")
     }
 
     private static func testMediaExtractionAndSelection() async throws {
@@ -125,5 +126,54 @@ struct SaveXKernelFixtureSmokeMain {
             preference: .preferHLS
         )
         try expect(explicitHLS.isHLS, "HLS preference should be route-first even when HLS lacks dimensions")
+
+        let mixedRequest = TweetRequest(
+            sourceURL: URL(string: "https://x.com/demo/status/1234567890/video/2")!,
+            tweetID: "1234567890",
+            screenName: "demo",
+            selectedMediaIndex: 2,
+            selectedMediaKind: .video
+        )
+        let mixedStatus: JSONDictionary = [
+            "full_text": "Mixed media",
+            "extended_entities": [
+                "media": [
+                    [
+                        "id_str": "photo-1",
+                        "type": "photo",
+                        "media_url_https": "https://pbs.twimg.com/media/photo.jpg",
+                    ],
+                    [
+                        "id_str": "video-2",
+                        "type": "video",
+                        "video_info": [
+                            "variants": [
+                                [
+                                    "bitrate": 832000,
+                                    "url": "https://video.twimg.com/ext_tw_video/2/pu/vid/640x360/demo.mp4",
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ]
+
+        let mixedEntries = try await TwitterMediaExtractor().extractEntries(from: mixedStatus, request: mixedRequest)
+        try expect(mixedEntries.count == 1, "selected mixed media video should resolve")
+        try expect(mixedEntries[0].id == "video-2", "selected media index should match original media position")
+
+        let photoRequest = TweetRequest(
+            sourceURL: URL(string: "https://x.com/demo/status/1234567890/photo/1")!,
+            tweetID: "1234567890",
+            screenName: "demo",
+            selectedMediaIndex: 1,
+            selectedMediaKind: .photo
+        )
+        do {
+            _ = try await TwitterMediaExtractor().extractEntries(from: mixedStatus, request: photoRequest)
+            throw KernelFixtureSmokeError.failed("selected photo media should not be treated as video")
+        } catch SaveXError.mediaNotVideo(index: 1) {
+        }
     }
 }

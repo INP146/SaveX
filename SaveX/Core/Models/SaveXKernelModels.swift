@@ -5,10 +5,30 @@ struct TweetRequest: Codable, Sendable, Equatable {
     let tweetID: String
     let screenName: String?
     let selectedMediaIndex: Int?
+    let selectedMediaKind: TweetMediaSelectionKind?
+
+    init(
+        sourceURL: URL,
+        tweetID: String,
+        screenName: String?,
+        selectedMediaIndex: Int?,
+        selectedMediaKind: TweetMediaSelectionKind? = nil
+    ) {
+        self.sourceURL = sourceURL
+        self.tweetID = tweetID
+        self.screenName = screenName
+        self.selectedMediaIndex = selectedMediaIndex
+        self.selectedMediaKind = selectedMediaKind
+    }
 
     var displayID: String {
         tweetID
     }
+}
+
+enum TweetMediaSelectionKind: String, Codable, Sendable, Equatable {
+    case video
+    case photo
 }
 
 enum MediaTransport: String, Codable, Sendable {
@@ -83,6 +103,7 @@ struct TweetMediaInfo: Identifiable, Sendable {
     let likeCount: Int?
     let repostCount: Int?
     let commentCount: Int?
+    let sourceMediaIndex: Int?
     let ageLimit: Int
     let tags: [String]
     let duration: Double?

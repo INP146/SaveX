@@ -25,6 +25,9 @@ struct HLSManifestSmokeMain {
             try testMediaPlaylist()
             try testUnsupportedEncryptedPlaylist()
             try testUnsupportedLivePlaylist()
+            try testUnsupportedFMP4Playlist()
+            try testUnsupportedByteRangePlaylist()
+            try testUnsupportedDiscontinuityPlaylist()
             print("hls manifest smoke passed")
         } catch {
             print("FAILED: \(error.localizedDescription)")
@@ -108,6 +111,56 @@ struct HLSManifestSmokeMain {
         do {
             _ = try HLSManifestParser().parse(source, baseURL: URL(string: "https://video.example.test/media/index.m3u8")!)
             throw HLSManifestSmokeError.failed("live playlist should fail")
+        } catch SaveXError.unsupportedHLS {
+        }
+    }
+
+    private static func testUnsupportedFMP4Playlist() throws {
+        let source = """
+        #EXTM3U
+        #EXT-X-MAP:URI="init.mp4"
+        #EXTINF:5.000,
+        segment-1.m4s
+        #EXT-X-ENDLIST
+        """
+
+        do {
+            _ = try HLSManifestParser().parse(source, baseURL: URL(string: "https://video.example.test/media/index.m3u8")!)
+            throw HLSManifestSmokeError.failed("fMP4 playlist should fail until EXT-X-MAP is supported")
+        } catch SaveXError.unsupportedHLS {
+        }
+    }
+
+    private static func testUnsupportedByteRangePlaylist() throws {
+        let source = """
+        #EXTM3U
+        #EXTINF:5.000,
+        #EXT-X-BYTERANGE:500@0
+        file.ts
+        #EXT-X-ENDLIST
+        """
+
+        do {
+            _ = try HLSManifestParser().parse(source, baseURL: URL(string: "https://video.example.test/media/index.m3u8")!)
+            throw HLSManifestSmokeError.failed("byte-range playlist should fail until range assembly is supported")
+        } catch SaveXError.unsupportedHLS {
+        }
+    }
+
+    private static func testUnsupportedDiscontinuityPlaylist() throws {
+        let source = """
+        #EXTM3U
+        #EXTINF:5.000,
+        segment-1.ts
+        #EXT-X-DISCONTINUITY
+        #EXTINF:5.000,
+        segment-2.ts
+        #EXT-X-ENDLIST
+        """
+
+        do {
+            _ = try HLSManifestParser().parse(source, baseURL: URL(string: "https://video.example.test/media/index.m3u8")!)
+            throw HLSManifestSmokeError.failed("discontinuity playlist should fail until discontinuity assembly is supported")
         } catch SaveXError.unsupportedHLS {
         }
     }
