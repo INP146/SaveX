@@ -28,6 +28,14 @@
 		A00100010001000100010014 /* LogsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010015 /* LogsView.swift */; };
 		A00100010001000100010015 /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010016 /* LibraryView.swift */; };
 		A00100010001000100010016 /* NetworkPermissionRequester.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010017 /* NetworkPermissionRequester.swift */; };
+		A00100010001000100010018 /* HLSMediaExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010018 /* HLSMediaExport.swift */; };
+		A00100010001000100010019 /* HLSManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010019 /* HLSManifest.swift */; };
+		A0010001000100010001001A /* HTTPResumeStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0010001000200010001001A /* HTTPResumeStore.swift */; };
+		A0010001000100010001001B /* HLSResumeStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0010001000200010001001B /* HLSResumeStore.swift */; };
+		A0010001000100010001001C /* HLSMediaDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0010001000200010001001C /* HLSMediaDownloader.swift */; };
+		A0010001000100010001001D /* BackgroundHTTPDownloadCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0010001000200010001001D /* BackgroundHTTPDownloadCoordinator.swift */; };
+		A0010001000100010001001E /* HTTPFileDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0010001000200010001001E /* HTTPFileDownloader.swift */; };
+		A0010001000100010001001F /* DownloadCoreTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0010001000200010001001F /* DownloadCoreTypes.swift */; };
 		B00100010001000100010001 /* SaveXKernelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00100010002000100010001 /* SaveXKernelTests.swift */; };
 /* End PBXBuildFile section */
 
@@ -64,6 +72,14 @@
 		A00100010002000100010015 /* LogsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogsView.swift; sourceTree = "<group>"; };
 		A00100010002000100010016 /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
 		A00100010002000100010017 /* NetworkPermissionRequester.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkPermissionRequester.swift; sourceTree = "<group>"; };
+		A00100010002000100010018 /* HLSMediaExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HLSMediaExport.swift; sourceTree = "<group>"; };
+		A00100010002000100010019 /* HLSManifest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HLSManifest.swift; sourceTree = "<group>"; };
+		A0010001000200010001001A /* HTTPResumeStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPResumeStore.swift; sourceTree = "<group>"; };
+		A0010001000200010001001B /* HLSResumeStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HLSResumeStore.swift; sourceTree = "<group>"; };
+		A0010001000200010001001C /* HLSMediaDownloader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HLSMediaDownloader.swift; sourceTree = "<group>"; };
+		A0010001000200010001001D /* BackgroundHTTPDownloadCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundHTTPDownloadCoordinator.swift; sourceTree = "<group>"; };
+		A0010001000200010001001E /* HTTPFileDownloader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPFileDownloader.swift; sourceTree = "<group>"; };
+		A0010001000200010001001F /* DownloadCoreTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadCoreTypes.swift; sourceTree = "<group>"; };
 		B00100010002000100010001 /* SaveXKernelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveXKernelTests.swift; sourceTree = "<group>"; };
 		B00100010002000100010002 /* SaveXTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SaveXTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -229,7 +245,15 @@
 		A0010001000400010001000E /* Download */ = {
 			isa = PBXGroup;
 			children = (
+				A0010001000200010001001F /* DownloadCoreTypes.swift */,
 				A00100010002000100010012 /* SaveXDownloadKernel.swift */,
+				A0010001000200010001001D /* BackgroundHTTPDownloadCoordinator.swift */,
+				A0010001000200010001001E /* HTTPFileDownloader.swift */,
+				A0010001000200010001001A /* HTTPResumeStore.swift */,
+				A00100010002000100010019 /* HLSManifest.swift */,
+				A0010001000200010001001C /* HLSMediaDownloader.swift */,
+				A00100010002000100010018 /* HLSMediaExport.swift */,
+				A0010001000200010001001B /* HLSResumeStore.swift */,
 			);
 			path = Download;
 			sourceTree = "<group>";
@@ -458,7 +482,15 @@
 				A00100010001000100010009 /* GlassPanel.swift in Sources */,
 				A0010001000100010001000A /* SaveXBackground.swift in Sources */,
 				A0010001000100010001000D /* SaveXExtractionKernel.swift in Sources */,
+				A0010001000100010001001F /* DownloadCoreTypes.swift in Sources */,
 				A00100010001000100010011 /* SaveXDownloadKernel.swift in Sources */,
+				A0010001000100010001001D /* BackgroundHTTPDownloadCoordinator.swift in Sources */,
+				A0010001000100010001001E /* HTTPFileDownloader.swift in Sources */,
+				A0010001000100010001001A /* HTTPResumeStore.swift in Sources */,
+				A00100010001000100010019 /* HLSManifest.swift in Sources */,
+				A0010001000100010001001C /* HLSMediaDownloader.swift in Sources */,
+				A00100010001000100010018 /* HLSMediaExport.swift in Sources */,
+				A0010001000100010001001B /* HLSResumeStore.swift in Sources */,
 				A0010001000100010001000F /* SaveXKernelModels.swift in Sources */,
 				A00100010001000100010002 /* HomeView.swift in Sources */,
 				A0010001000100010001000B /* StatusPill.swift in Sources */,

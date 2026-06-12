@@ -92,6 +92,132 @@ final class SaveXKernelTests: XCTestCase {
         }
     }
 
+    @MainActor
+    func testReadyJobIsPreservedWhenRestoredFromStore() throws {
+        let root = Self.temporaryRoot()
+        defer {
+            try? FileManager.default.removeItem(at: root)
+        }
+        let fileManager = TestFileManager(root: root)
+        let job = DownloadJob(
+            request: Self.request(),
+            phase: .ready,
+            progress: 1,
+            displayTitle: "Ready video",
+            selectedFormatID: "http-832000",
+            outputFilename: "ready.mp4",
+            localFileURL: root.appendingPathComponent("SaveX/Downloads/ready.mp4"),
+            savedFileSize: 3,
+            errorMessage: "Library save failed",
+            downloadedBytes: 3,
+            totalBytes: 3,
+            progressMessage: "Downloaded, but Library save failed"
+        )
+        DownloadJobStore(fileManager: fileManager).upsert(DownloadJobRecord(
+            job: job,
+            preference: .preferMP4Direct
+        ))
+
+        let center = DownloadCenter(
+            container: AppContainer(),
+            loadPersistedLibrary: false,
+            loadPersistedJobs: true,
+            fileManager: fileManager
+        )
+
+        XCTAssertEqual(center.jobs.count, 1)
+        XCTAssertEqual(center.jobs[0].phase, .ready)
+        XCTAssertEqual(center.jobs[0].localFileURL, job.localFileURL)
+        XCTAssertEqual(center.jobs[0].progress, 1)
+    }
+
+    @MainActor
+    func testDeletingReadyJobRemovesUnreferencedLocalFile() throws {
+        let root = Self.temporaryRoot()
+        defer {
+            try? FileManager.default.removeItem(at: root)
+        }
+        let fileManager = TestFileManager(root: root)
+        let downloads = root.appendingPathComponent("SaveX/Downloads", isDirectory: true)
+        try fileManager.createDirectory(at: downloads, withIntermediateDirectories: true)
+        let fileURL = downloads.appendingPathComponent("ready.mp4", isDirectory: false)
+        try Data([1, 2, 3]).write(to: fileURL)
+
+        let job = DownloadJob(
+            request: Self.request(),
+            phase: .ready,
+            progress: 1,
+            outputFilename: fileURL.lastPathComponent,
+            localFileURL: fileURL,
+            savedFileSize: 3,
+            downloadedBytes: 3,
+            totalBytes: 3
+        )
+        let center = DownloadCenter(
+            container: AppContainer(),
+            jobs: [job],
+            loadPersistedLibrary: false,
+            loadPersistedJobs: false,
+            fileManager: fileManager
+        )
+
+        center.deleteJob(job)
+
+        XCTAssertTrue(center.jobs.isEmpty)
+        XCTAssertFalse(fileManager.fileExists(atPath: fileURL.path))
+    }
+
+    func testDownloadEngineCancelAndCleanRemovesHLSResumeArtifacts() async throws {
+        let root = Self.temporaryRoot()
+        defer {
+            try? FileManager.default.removeItem(at: root)
+        }
+        let fileManager = TestFileManager(root: root)
+        let jobID = UUID()
+        let format = Self.hlsFormat()
+        let resumeStore = HLSResumeStore(fileManager: fileManager)
+        resumeStore.prepareState(
+            jobID: jobID,
+            format: format,
+            segments: [
+                HLSSegment(
+                    url: URL(string: "https://video.example.test/segment-1.ts")!,
+                    duration: 4,
+                    title: nil
+                ),
+            ]
+        )
+        let workingDirectory = resumeStore.workingDirectory(jobID: jobID)
+        try fileManager.createDirectory(at: workingDirectory, withIntermediateDirectories: true)
+        try Data([0x47]).write(to: workingDirectory.appendingPathComponent("segment-00000.ts"))
+
+        let configuration = URLSessionConfiguration.ephemeral
+        let session = URLSession(configuration: configuration)
+        let engine = DownloadEngine(
+            apiClient: TwitterAPIClient(session: session),
+            extractor: TwitterMediaExtractor(),
+            selector: FormatSelector(),
+            fileDownloader: HTTPFileDownloader(
+                session: session,
+                backgroundCoordinator: nil,
+                fileManager: fileManager
+            ),
+            hlsDownloader: HLSMediaDownloader(
+                session: session,
+                fileManager: fileManager,
+                resumeStore: resumeStore
+            )
+        )
+
+        XCTAssertNotNil(resumeStore.state(jobID: jobID))
+        XCTAssertTrue(fileManager.fileExists(atPath: workingDirectory.path))
+
+        await engine.cancelAndClean(jobID: jobID)
+
+        XCTAssertNil(resumeStore.state(jobID: jobID))
+        XCTAssertFalse(fileManager.fileExists(atPath: workingDirectory.path))
+    }
+
     private static let mixedMediaStatus: JSONDictionary = [
         "full_text": "Mixed media",
         "extended_entities": [
@@ -129,4 +255,56 @@ final class SaveXKernelTests: XCTestCase {
             ],
         ],
     ]
+
+    private static func request() -> TweetRequest {
+        TweetRequest(
+            sourceURL: URL(string: "https://x.com/demo/status/1234567890")!,
+            tweetID: "1234567890",
+            screenName: "demo",
+            selectedMediaIndex: nil
+        )
+    }
+
+    private static func hlsFormat() -> MediaFormat {
+        MediaFormat(
+            id: "1234567890-hls",
+            url: URL(string: "https://video.example.test/master.m3u8")!,
+            formatID: "hls",
+            transport: .m3u8Native,
+            container: .mp4,
+            bitrate: nil,
+            width: 640,
+            height: 360,
+            fileSizeApprox: nil,
+            videoCodec: nil,
+            audioCodec: nil,
+            httpHeaders: [:]
+        )
+    }
+
+    private static func temporaryRoot() -> URL {
+        URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+            .appendingPathComponent("SaveXTests-\(UUID().uuidString)", isDirectory: true)
+    }
+}
+
+private final class TestFileManager: FileManager, @unchecked Sendable {
+    private let root: URL
+
+    init(root: URL) {
+        self.root = root
+        super.init()
+    }
+
+    override func urls(
+        for directory: FileManager.SearchPathDirectory,
+        in domainMask: FileManager.SearchPathDomainMask
+    ) -> [URL] {
+        switch directory {
+        case .documentDirectory, .applicationSupportDirectory:
+            return [root]
+        default:
+            return super.urls(for: directory, in: domainMask)
+        }
+    }
 }

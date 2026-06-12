@@ -227,9 +227,15 @@ final class DownloadCenter: ObservableObject {
 
     private func observeRestoredBackgroundTasks() async {
         let restoredJobIDs = Set(jobs.filter { $0.phase == .waitingForSystem }.map(\.id))
-        let attachedJobIDs = await BackgroundHTTPDownloadCoordinator.shared.observeRestoredTasks(jobIDs: restoredJobIDs) { [weak self] jobID, event in
-            await self?.applyProgressEvent(jobID: jobID, event: event)
-        }
+        let attachedJobIDs = await BackgroundHTTPDownloadCoordinator.shared.observeRestoredTasks(
+            jobIDs: restoredJobIDs,
+            onProgressEvent: { [weak self] jobID, event in
+                await self?.applyProgressEvent(jobID: jobID, event: event)
+            },
+            onFailure: { [weak self] jobID, error in
+                await self?.handleRestoredBackgroundFailure(jobID: jobID, error: error)
+            }
+        )
 
         for jobID in restoredJobIDs.subtracting(attachedJobIDs) {
             guard let job = jobs.first(where: { $0.id == jobID }) else {
@@ -251,6 +257,32 @@ final class DownloadCenter: ObservableObject {
                 tweetID: job.request.tweetID
             )
         }
+    }
+
+    private func handleRestoredBackgroundFailure(jobID: UUID, error: Error) async {
+        guard let job = jobs.first(where: { $0.id == jobID }) else {
+            return
+        }
+        guard job.phase == .waitingForSystem || job.phase == .downloading else {
+            return
+        }
+
+        updateJob(id: jobID) { job in
+            job.phase = .failed
+            job.progress = min(job.progress, 0.96)
+            job.errorMessage = error.localizedDescription
+            job.progressMessage = "Background download failed"
+            job.speedBytesPerSecond = nil
+            job.etaSeconds = nil
+        }
+        banner = DownloadBanner(text: error.localizedDescription, kind: .error)
+        appendLog(
+            kind: .error,
+            title: "Background download failed",
+            message: error.localizedDescription,
+            jobID: jobID,
+            tweetID: job.request.tweetID
+        )
     }
 
     private func restartInterruptedBackgroundFailures() async {
@@ -365,7 +397,7 @@ final class DownloadCenter: ObservableObject {
             guard let self else {
                 return
             }
-            await BackgroundHTTPDownloadCoordinator.shared.cancel(jobID: job.id)
+            await self.container.downloadEngine.cancelAndClean(jobID: job.id)
             self.restartJobAfterCleanup(
                 job,
                 progressMessage: "Queued retry",
@@ -482,6 +514,7 @@ final class DownloadCenter: ObservableObject {
     func deleteJob(_ job: DownloadJob) {
         downloadTasks[job.id]?.cancel()
         downloadTasks.removeValue(forKey: job.id)
+        discardJobLocalFileIfUnreferenced(job)
         jobs.removeAll { $0.id == job.id }
         jobPreferences.removeValue(forKey: job.id)
         lastProgressPersistenceAt.removeValue(forKey: job.id)
@@ -490,8 +523,8 @@ final class DownloadCenter: ObservableObject {
         }
         appendLog(kind: .info, title: "Deleted job", message: "Removed job from Jobs.", jobID: job.id, tweetID: job.request.tweetID)
 
-        Task {
-            await BackgroundHTTPDownloadCoordinator.shared.cancel(jobID: job.id)
+        Task { [container] in
+            await container.downloadEngine.cancelAndClean(jobID: job.id)
         }
     }
 
@@ -576,6 +609,7 @@ final class DownloadCenter: ObservableObject {
                 )
             }
             guard jobs.contains(where: { $0.id == jobID }) else {
+                discardDownloadedAsset(asset, tweetID: request.tweetID)
                 return
             }
 
@@ -842,13 +876,37 @@ final class DownloadCenter: ObservableObject {
 
     @discardableResult
     private func discardRecoveredAsset(_ asset: DownloadedAsset) -> Bool {
+        discardLocalFile(at: asset.localFileURL, tweetID: asset.sourceTweetID)
+    }
+
+    @discardableResult
+    private func discardDownloadedAsset(_ asset: DownloadedAsset, tweetID: String?) -> Bool {
+        discardLocalFile(at: asset.localFileURL, tweetID: tweetID ?? asset.sourceTweetID)
+    }
+
+    @discardableResult
+    private func discardJobLocalFileIfUnreferenced(_ job: DownloadJob) -> Bool {
+        guard let localFileURL = job.localFileURL else {
+            return true
+        }
+        let isReferencedByLibrary = libraryItems.contains { item in
+            fileURL(for: item).standardizedFileURL.path == localFileURL.standardizedFileURL.path
+        }
+        guard !isReferencedByLibrary else {
+            return true
+        }
+        return discardLocalFile(at: localFileURL, tweetID: job.request.tweetID)
+    }
+
+    @discardableResult
+    private func discardLocalFile(at url: URL, tweetID: String?) -> Bool {
         do {
-            if fileManager.fileExists(atPath: asset.localFileURL.path) {
-                try fileManager.removeItem(at: asset.localFileURL)
+            if fileManager.fileExists(atPath: url.path) {
+                try fileManager.removeItem(at: url)
             }
             return true
         } catch {
-            appendLog(kind: .warning, title: "File cleanup failed", message: error.localizedDescription, tweetID: asset.sourceTweetID)
+            appendLog(kind: .warning, title: "File cleanup failed", message: error.localizedDescription, tweetID: tweetID)
             return false
         }
     }
@@ -903,6 +961,13 @@ final class DownloadCenter: ObservableObject {
         }
         if job.phase == .paused {
             job.progressMessage = "Paused"
+            job.speedBytesPerSecond = nil
+            job.etaSeconds = nil
+            return job
+        }
+        if job.phase == .ready {
+            job.progress = 1
+            job.progressMessage = job.progressMessage ?? "Downloaded, but Library save failed"
             job.speedBytesPerSecond = nil
             job.etaSeconds = nil
             return job
