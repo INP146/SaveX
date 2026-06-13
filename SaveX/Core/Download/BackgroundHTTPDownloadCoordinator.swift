@@ -2,7 +2,7 @@ import Foundation
 
 final class BackgroundHTTPDownloadCoordinator: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
     static let shared = BackgroundHTTPDownloadCoordinator()
-    static let sessionIdentifier = "com.savex.background.http-file"
+    static let sessionIdentifier = "io.github.inp146.savex.background.http-file"
 
     private struct TaskMetadata: Codable {
         let taskIdentifier: Int

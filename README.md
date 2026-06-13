@@ -16,8 +16,8 @@
 </p>
 
 <p>
-  <a href="https://INP146.github.io/AltSource/install/altstore/com.savex.html"><img src="docs/badges/DownloadBadge_dark.png" alt="Download on AltStore" height="45" /></a>
-  <a href="https://INP146.github.io/AltSource/install/sidestore/com.savex.html"><img src="docs/badges/add-source-to-sidestore.png" alt="Add Source to SideStore" height="45" /></a>
+  <a href="https://INP146.github.io/AltSource/install/altstore/io.github.inp146.savex.html"><img src="docs/badges/DownloadBadge_dark.png" alt="Download on AltStore" height="45" /></a>
+  <a href="https://INP146.github.io/AltSource/install/sidestore/io.github.inp146.savex.html"><img src="docs/badges/add-source-to-sidestore.png" alt="Add Source to SideStore" height="45" /></a>
 </p>
 
 </div>
