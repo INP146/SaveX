@@ -58,6 +58,7 @@ struct StablePageScrollView<Content: View>: View {
 private enum SaveXGlassButtonMetrics {
     static let height: CGFloat = 30
     static let compactWidth: CGFloat = 76
+    static let iconDiameter: CGFloat = 42
 }
 
 extension View {
@@ -71,7 +72,14 @@ extension View {
 
     func saveXGlassIcon() -> some View {
         font(.headline)
-            .frame(width: SaveXGlassButtonMetrics.height, height: SaveXGlassButtonMetrics.height)
+            .frame(width: SaveXGlassButtonMetrics.iconDiameter, height: SaveXGlassButtonMetrics.iconDiameter)
+            .glassEffect(.regular.interactive(), in: Circle())
+            .contentShape(Circle())
+    }
+
+    func saveXGlassIconButton() -> some View {
+        buttonStyle(.plain)
+            .contentShape(Circle())
     }
 
     func saveXNavigationChrome() -> some View {

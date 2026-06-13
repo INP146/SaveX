@@ -38,7 +38,7 @@ struct LogsView: View {
                 Image(systemName: "doc.on.doc")
                     .saveXGlassIcon()
             }
-            .buttonStyle(.glass)
+            .saveXGlassIconButton()
             .disabled(downloadCenter.logs.isEmpty)
             .accessibilityLabel("Copy logs")
 
@@ -48,7 +48,7 @@ struct LogsView: View {
                 Image(systemName: "trash")
                     .saveXGlassIcon()
             }
-            .buttonStyle(.glass)
+            .saveXGlassIconButton()
             .disabled(downloadCenter.logs.isEmpty)
             .accessibilityLabel("Clear logs")
         }

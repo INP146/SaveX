@@ -10,7 +10,6 @@
 		A00100010001000100010001 /* SaveXApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010001 /* SaveXApp.swift */; };
 		A00100010001000100010002 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010002 /* HomeView.swift */; };
 		A00100010001000100010003 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010003 /* Assets.xcassets */; };
-		A00100010001000100010040 /* savex.icon in Resources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010040 /* savex.icon */; };
 		A00100010001000100010004 /* AppContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010005 /* AppContainer.swift */; };
 		A00100010001000100010005 /* AppRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010006 /* AppRouter.swift */; };
 		A00100010001000100010006 /* JobsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010007 /* JobsView.swift */; };
@@ -39,6 +38,7 @@
 		A0010001000100010001001F /* DownloadCoreTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0010001000200010001001F /* DownloadCoreTypes.swift */; };
 		A00100010001000100010020 /* TwitterCookieStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010020 /* TwitterCookieStore.swift */; };
 		A00100010001000100010021 /* KeychainStringStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010021 /* KeychainStringStore.swift */; };
+		A00100010001000100010040 /* savex.icon in Resources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010040 /* savex.icon */; };
 		B00100010001000100010001 /* SaveXKernelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00100010002000100010001 /* SaveXKernelTests.swift */; };
 /* End PBXBuildFile section */
 
@@ -57,7 +57,6 @@
 		A00100010002000100010002 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		A00100010002000100010003 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A00100010002000100010004 /* SaveX.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SaveX.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		A00100010002000100010040 /* savex.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = savex.icon; sourceTree = "<group>"; };
 		A00100010002000100010005 /* AppContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppContainer.swift; sourceTree = "<group>"; };
 		A00100010002000100010006 /* AppRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRouter.swift; sourceTree = "<group>"; };
 		A00100010002000100010007 /* JobsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JobsView.swift; sourceTree = "<group>"; };
@@ -86,6 +85,7 @@
 		A0010001000200010001001F /* DownloadCoreTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadCoreTypes.swift; sourceTree = "<group>"; };
 		A00100010002000100010020 /* TwitterCookieStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TwitterCookieStore.swift; sourceTree = "<group>"; };
 		A00100010002000100010021 /* KeychainStringStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStringStore.swift; sourceTree = "<group>"; };
+		A00100010002000100010040 /* savex.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = savex.icon; sourceTree = "<group>"; };
 		B00100010002000100010001 /* SaveXKernelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveXKernelTests.swift; sourceTree = "<group>"; };
 		B00100010002000100010002 /* SaveXTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SaveXTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -141,14 +141,6 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		B00100010004000100010001 /* SaveXTests */ = {
-			isa = PBXGroup;
-			children = (
-				B00100010002000100010001 /* SaveXKernelTests.swift */,
-			);
-			path = SaveXTests;
-			sourceTree = "<group>";
-		};
 		A00100010004000100010004 /* App */ = {
 			isa = PBXGroup;
 			children = (
@@ -196,14 +188,6 @@
 			path = Logs;
 			sourceTree = "<group>";
 		};
-		A0010001000400010001001D /* Library */ = {
-			isa = PBXGroup;
-			children = (
-				A00100010002000100010016 /* LibraryView.swift */,
-			);
-			path = Library;
-			sourceTree = "<group>";
-		};
 		A00100010004000100010009 /* Settings */ = {
 			isa = PBXGroup;
 			children = (
@@ -233,14 +217,6 @@
 				A0010001000200010001000D /* SaveXTwitterKernel.swift */,
 			);
 			path = Twitter;
-			sourceTree = "<group>";
-		};
-		A0010001000400010001001E /* Security */ = {
-			isa = PBXGroup;
-			children = (
-				A00100010002000100010021 /* KeychainStringStore.swift */,
-			);
-			path = Security;
 			sourceTree = "<group>";
 		};
 		A0010001000400010001000C /* Extraction */ = {
@@ -387,6 +363,30 @@
 			children = (
 			);
 			path = Extensions;
+			sourceTree = "<group>";
+		};
+		A0010001000400010001001D /* Library */ = {
+			isa = PBXGroup;
+			children = (
+				A00100010002000100010016 /* LibraryView.swift */,
+			);
+			path = Library;
+			sourceTree = "<group>";
+		};
+		A0010001000400010001001E /* Security */ = {
+			isa = PBXGroup;
+			children = (
+				A00100010002000100010021 /* KeychainStringStore.swift */,
+			);
+			path = Security;
+			sourceTree = "<group>";
+		};
+		B00100010004000100010001 /* SaveXTests */ = {
+			isa = PBXGroup;
+			children = (
+				B00100010002000100010001 /* SaveXKernelTests.swift */,
+			);
+			path = SaveXTests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -611,8 +611,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"SaveX/Preview Content\"";
 				DEVELOPMENT_TEAM = 4KZR8B23CV;
-				ENABLE_TESTABILITY = YES;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_TESTABILITY = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = SaveX;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
@@ -626,7 +626,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.0.2;
+				MARKETING_VERSION = 0.0.3;
 				PRODUCT_BUNDLE_IDENTIFIER = io.github.inp146.savex;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -658,7 +658,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.0.2;
+				MARKETING_VERSION = 0.0.3;
 				PRODUCT_BUNDLE_IDENTIFIER = io.github.inp146.savex;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
