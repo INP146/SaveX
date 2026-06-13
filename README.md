@@ -26,16 +26,18 @@
 
 SaveX's Twitter/X parsing, format extraction, and format sorting logic are informed by the [yt-dlp](https://github.com/yt-dlp/yt-dlp) project. The current implementation does not run `yt-dlp` directly on iOS; instead, it reimplements the relevant download chain as a native Swift iOS download kernel.
 
-For a deeper walkthrough, see [yt-dlp Twitter/X download chain](docs/yt-dlp-twitter-download-chain.md).
+For a deeper walkthrough, see [yt-dlp Twitter/X download chain](docs/agent/yt-dlp-twitter-download-chain.md).
 
 ## Current Features
 
 - Parses `x.com` and `twitter.com` Tweet URLs
 - Fetches Tweet data through Twitter/X GraphQL, legacy API, and syndication fallback paths
+- Supports optional Twitter/X Cookie header storage in Keychain for content available to that session
 - Extracts video format candidates from Tweet media variants and card data
-- Supports direct MP4 downloads
-- Supports basic HLS VOD downloads
+- Supports direct MP4 downloads and basic HLS VOD downloads
+- Supports resumable/background MP4 downloads, pause/resume, retry, and launch recovery for persisted jobs
 - Includes Jobs, Logs, Library, and Settings views
+- Provides a local Library with playback, detail views, sharing, deletion, generated covers, and multiple layouts
 - Attempts to save completed downloads to Photos
 - Keeps local library records, so downloaded files remain visible in the app even if saving to Photos fails
 
@@ -57,13 +59,12 @@ If the requested route is not available, SaveX falls back to the best available 
 
 ## Known Limitations
 
-- Only public, accessible Twitter/X video content is supported
+- Public Twitter/X video content and content accessible to the configured Twitter/X Cookie session are supported
 - Twitter/X APIs, fields, and rate limits may change; some links may need fallback paths or may temporarily fail
 - HLS support is currently aimed at VOD playlists, not live playlists
 - Encrypted HLS segments are not supported
 - Low-latency HLS tags are not supported
-- Some Settings controls are still UI placeholders and are not fully wired into the download kernel
-- The `v0.0.1` release IPA is unsigned and must be sideloaded or re-signed manually
+- Release IPAs are unsigned and must be sideloaded or re-signed manually
 
 ## License
 

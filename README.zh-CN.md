@@ -26,16 +26,18 @@
 
 SaveX 的 Twitter/X 解析、格式提取和格式排序思路参考了 [yt-dlp](https://github.com/yt-dlp/yt-dlp) 项目。当前实现不是直接在 iOS 内运行 `yt-dlp`，而是基于相关下载链路，用 Swift 实现本地 iOS 下载内核。
 
-更详细的链路分析见 [yt-dlp Twitter/X download chain](docs/yt-dlp-twitter-download-chain.md)。
+更详细的链路分析见 [yt-dlp Twitter/X download chain](docs/agent/yt-dlp-twitter-download-chain.md)。
 
 ## 当前能力
 
 - 解析 `x.com` / `twitter.com` Tweet URL
 - 通过 Twitter/X GraphQL、legacy API 和 syndication fallback 获取 Tweet 数据
+- 支持把可选的 Twitter/X Cookie Header 存入 Keychain，用于访问当前会话可见的内容
 - 从 Tweet media variants 和 card 数据中提取视频候选格式
-- 支持直链 MP4 下载
-- 支持基础 HLS VOD 下载
+- 支持 MP4 直链下载和基础 HLS VOD 下载
+- 支持可恢复/后台 MP4 下载、暂停/继续、重试，以及启动后恢复持久化任务状态
 - 支持任务列表、下载日志、本地媒体库和设置页面
+- 本地媒体库支持播放、详情页、分享、删除、封面生成和多种布局
 - 下载完成后尝试写入 Photos
 - 保留本地媒体库记录，Photos 保存失败时也能在应用内查看已下载文件
 
@@ -57,13 +59,12 @@ SaveX 的 Twitter/X 解析、格式提取和格式排序思路参考了 [yt-dlp]
 
 ## 已知限制
 
-- 只支持公开、可访问的 Twitter/X 视频内容
+- 支持公开 Twitter/X 视频内容，以及通过已配置 Twitter/X Cookie 会话可访问的内容
 - Twitter/X API、字段和限流策略可能变化，部分链接可能需要 fallback，或暂时不可用
 - 当前 HLS 支持面向 VOD，不支持 live playlist
 - 不支持加密 HLS segment
 - 不支持 low-latency HLS 标签
-- Settings 页面里的部分策略项仍是 UI 占位，尚未全部接入下载内核
-- `v0.0.1` release IPA 是未签名构建，需自行侧载
+- Release IPA 是未签名构建，需自行侧载或重签名
 
 ## License
 
