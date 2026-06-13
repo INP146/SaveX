@@ -128,6 +128,50 @@ struct DownloadJobStore {
     }
 }
 
+private struct DownloadStoragePreferences {
+    let savesToLibrary: Bool
+    let savesToPhotos: Bool
+
+    static func current(userDefaults: UserDefaults) -> DownloadStoragePreferences {
+        var savesToLibrary = bool(
+            forKey: SaveXStorageKey.savesDownloadsToLibrary,
+            defaultValue: true,
+            userDefaults: userDefaults
+        )
+        let savesToPhotos = bool(
+            forKey: SaveXStorageKey.savesDownloadsToPhotos,
+            defaultValue: true,
+            userDefaults: userDefaults
+        )
+
+        if !savesToLibrary && !savesToPhotos {
+            savesToLibrary = true
+        }
+
+        return DownloadStoragePreferences(
+            savesToLibrary: savesToLibrary,
+            savesToPhotos: savesToPhotos
+        )
+    }
+
+    private static func bool(
+        forKey key: String,
+        defaultValue: Bool,
+        userDefaults: UserDefaults
+    ) -> Bool {
+        guard let value = userDefaults.object(forKey: key) as? Bool else {
+            return defaultValue
+        }
+        return value
+    }
+}
+
+private struct LibraryStorageOutcome {
+    let asset: DownloadedAsset
+    let didSave: Bool
+    let errorMessage: String?
+}
+
 @MainActor
 final class DownloadCenter: ObservableObject {
     @Published private(set) var jobs: [DownloadJob]
@@ -137,6 +181,7 @@ final class DownloadCenter: ObservableObject {
 
     private let container: AppContainer
     private let fileManager: FileManager
+    private let userDefaults: UserDefaults
     private let jobStore: DownloadJobStore
     private let shouldPersistJobs: Bool
     private var jobPreferences: [UUID: FormatSelectionPreference]
@@ -152,7 +197,8 @@ final class DownloadCenter: ObservableObject {
         libraryItems: [LocalLibraryItem] = [],
         loadPersistedLibrary: Bool = true,
         loadPersistedJobs: Bool = true,
-        fileManager: FileManager = .default
+        fileManager: FileManager = .default,
+        userDefaults: UserDefaults = .standard
     ) {
         let jobStore = DownloadJobStore(fileManager: fileManager)
         let restoredRecords = loadPersistedJobs ? jobStore.load() : []
@@ -163,6 +209,7 @@ final class DownloadCenter: ObservableObject {
         self.banner = banner
         self.logs = logs
         self.fileManager = fileManager
+        self.userDefaults = userDefaults
         self.jobStore = jobStore
         self.shouldPersistJobs = loadPersistedJobs
         self.jobPreferences = Dictionary(uniqueKeysWithValues: restoredRecords.map { ($0.job.id, $0.preference) })
@@ -193,6 +240,10 @@ final class DownloadCenter: ObservableObject {
 
     var hasJobs: Bool {
         !jobs.isEmpty
+    }
+
+    private var storagePreferences: DownloadStoragePreferences {
+        DownloadStoragePreferences.current(userDefaults: userDefaults)
     }
 
     func prepareCapabilities() async {
@@ -308,81 +359,12 @@ final class DownloadCenter: ObservableObject {
 
     private func handleDetachedBackgroundCompletion(jobID: UUID, asset: DownloadedAsset) async {
         guard let job = jobs.first(where: { $0.id == jobID }) else {
-            let didRecord = recordRecoveredLibraryItem(asset: asset)
-            let didDiscard = didRecord ? false : discardRecoveredAsset(asset)
-            banner = DownloadBanner(
-                text: didRecord
-                    ? "Recovered background download \(asset.localFileURL.lastPathComponent)"
-                    : didDiscard
-                        ? "Background download recovery failed; discarded \(asset.localFileURL.lastPathComponent)"
-                        : "Background download recovery failed, and cleanup failed",
-                kind: didRecord ? .success : .error
-            )
-            appendLog(
-                kind: didRecord ? .warning : .error,
-                title: didRecord
-                    ? "Recovered orphan download"
-                    : didDiscard
-                        ? "Discarded orphan download"
-                        : "Orphan cleanup failed",
-                message: asset.localFileURL.lastPathComponent,
-                jobID: jobID,
-                tweetID: asset.sourceTweetID
-            )
+            await finishRecoveredBackgroundAsset(jobID: jobID, asset: asset)
             BackgroundHTTPDownloadCoordinator.shared.acknowledgeDetachedCompletion(jobID: jobID)
             return
         }
 
-        guard recordLibraryItem(asset: asset, request: job.request) else {
-            updateJob(id: jobID) { job in
-                applyDownloadedAsset(asset, to: &job)
-                job.phase = .ready
-                job.progress = 1
-                job.errorMessage = "Library save failed"
-                job.progressMessage = "Downloaded, but Library save failed"
-            }
-            banner = DownloadBanner(
-                text: "Downloaded \(asset.localFileURL.lastPathComponent), but Library save failed",
-                kind: .error
-            )
-            appendLog(
-                kind: .warning,
-                title: "Background Library save failed",
-                message: asset.localFileURL.lastPathComponent,
-                jobID: jobID,
-                tweetID: job.request.tweetID
-            )
-            return
-        }
-
-        updateJob(id: jobID) { job in
-            job.phase = .completed
-            job.progress = 1
-            job.displayTitle = asset.localFileURL.deletingPathExtension().lastPathComponent
-            job.selectedFormatID = asset.format.formatID
-            job.outputFilename = asset.localFileURL.lastPathComponent
-            job.localFileURL = asset.localFileURL
-            job.savedFileSize = asset.fileSize
-            job.downloadedBytes = asset.fileSize
-            job.totalBytes = asset.fileSize
-            job.speedBytesPerSecond = nil
-            job.etaSeconds = nil
-            job.progressMessage = nil
-            job.errorMessage = nil
-        }
-
-        do {
-            try await container.photoLibraryWriter.saveVideoToLibrary(at: asset.localFileURL)
-            banner = DownloadBanner(text: "Saved \(asset.localFileURL.lastPathComponent) to Photos", kind: .success)
-            appendLog(kind: .success, title: "Background download saved", message: asset.localFileURL.lastPathComponent, jobID: jobID, tweetID: job.request.tweetID)
-        } catch {
-            banner = DownloadBanner(
-                text: "Downloaded \(asset.localFileURL.lastPathComponent), but Photos save failed: \(error.localizedDescription)",
-                kind: .error
-            )
-            appendLog(kind: .warning, title: "Background Photos save failed", message: error.localizedDescription, jobID: jobID, tweetID: job.request.tweetID)
-        }
-
+        await finishDownloadedAsset(asset, jobID: jobID, request: job.request, logPrefix: "Background")
         BackgroundHTTPDownloadCoordinator.shared.acknowledgeDetachedCompletion(jobID: jobID)
     }
 
@@ -593,7 +575,7 @@ final class DownloadCenter: ObservableObject {
                 jobID: jobID,
                 request: request,
                 preference: preference,
-                destinationDirectory: downloadsDirectory
+                destinationDirectory: stagingDownloadsDirectory
             ) { [weak self] event in
                 await self?.applyProgressEvent(
                     jobID: jobID,
@@ -613,72 +595,7 @@ final class DownloadCenter: ObservableObject {
                 return
             }
 
-            guard recordLibraryItem(asset: asset, request: request) else {
-                updateJob(id: jobID) { job in
-                    applyDownloadedAsset(asset, to: &job)
-                    job.phase = .ready
-                    job.progress = 1
-                    job.errorMessage = "Library save failed"
-                    job.progressMessage = "Downloaded, but Library save failed"
-                }
-                banner = DownloadBanner(
-                    text: "Downloaded \(asset.localFileURL.lastPathComponent), but Library save failed",
-                    kind: .error
-                )
-                appendLog(
-                    kind: .warning,
-                    title: "Library save failed",
-                    message: asset.localFileURL.lastPathComponent,
-                    jobID: jobID,
-                    tweetID: request.tweetID
-                )
-                downloadTasks.removeValue(forKey: jobID)
-                return
-            }
-
-            updateJob(id: jobID) { job in
-                applyDownloadedAsset(asset, to: &job)
-                job.phase = .completed
-                job.progress = 1
-                if job.totalSegmentCount != nil {
-                    job.completedSegmentCount = job.totalSegmentCount
-                }
-                job.progressMessage = nil
-                job.errorMessage = nil
-            }
-            applyProgressEvent(
-                jobID: jobID,
-                event: DownloadProgressEvent(
-                    kind: .photoSave,
-                    phase: .savingToPhotos,
-                    progress: 0.98,
-                    formatID: asset.format.formatID,
-                    downloadedBytes: asset.fileSize,
-                    totalBytes: asset.fileSize,
-                    message: "Saving to Photos"
-                )
-            )
-            do {
-                try await container.photoLibraryWriter.saveVideoToLibrary(at: asset.localFileURL)
-                updateJob(id: jobID) { job in
-                    job.phase = .completed
-                    job.progress = 1
-                    job.progressMessage = nil
-                }
-                banner = DownloadBanner(text: "Saved \(asset.localFileURL.lastPathComponent) to Photos", kind: .success)
-                appendLog(kind: .success, title: "Saved to Photos", message: asset.localFileURL.lastPathComponent, jobID: jobID, tweetID: request.tweetID)
-            } catch {
-                updateJob(id: jobID) { job in
-                    job.phase = .completed
-                    job.progress = 1
-                    job.progressMessage = nil
-                }
-                banner = DownloadBanner(
-                    text: "Downloaded \(asset.localFileURL.lastPathComponent), but Photos save failed: \(error.localizedDescription)",
-                    kind: .error
-                )
-                appendLog(kind: .warning, title: "Photos save failed", message: error.localizedDescription, jobID: jobID, tweetID: request.tweetID)
-            }
+            await finishDownloadedAsset(asset, jobID: jobID, request: request, logPrefix: nil)
             downloadTasks.removeValue(forKey: jobID)
         } catch {
             guard jobs.contains(where: { $0.id == jobID }) else {
@@ -729,6 +646,237 @@ final class DownloadCenter: ObservableObject {
         }
     }
 
+    private func finishDownloadedAsset(
+        _ asset: DownloadedAsset,
+        jobID: UUID,
+        request: TweetRequest,
+        logPrefix: String?
+    ) async {
+        let preferences = storagePreferences
+        var workingAsset = asset
+        var didSaveToLibrary = false
+        var libraryErrorMessage: String?
+
+        if preferences.savesToLibrary {
+            let outcome = storeAssetInLibrary(asset, request: request)
+            workingAsset = outcome.asset
+            didSaveToLibrary = outcome.didSave
+            libraryErrorMessage = outcome.errorMessage
+
+            if let libraryErrorMessage = libraryErrorMessage {
+                appendLog(
+                    kind: .warning,
+                    title: prefixed("Library save failed", prefix: logPrefix),
+                    message: libraryErrorMessage,
+                    jobID: jobID,
+                    tweetID: request.tweetID
+                )
+            }
+
+            if !didSaveToLibrary && !preferences.savesToPhotos {
+                markJobReadyAfterStorageFailure(
+                    jobID: jobID,
+                    asset: workingAsset,
+                    message: "Library save failed"
+                )
+                banner = DownloadBanner(
+                    text: "Downloaded \(workingAsset.localFileURL.lastPathComponent), but Library save failed",
+                    kind: .error
+                )
+                return
+            }
+        }
+
+        if preferences.savesToPhotos {
+            applyProgressEvent(
+                jobID: jobID,
+                event: DownloadProgressEvent(
+                    kind: .photoSave,
+                    phase: .savingToPhotos,
+                    progress: 0.98,
+                    formatID: workingAsset.format.formatID,
+                    downloadedBytes: workingAsset.fileSize,
+                    totalBytes: workingAsset.fileSize,
+                    message: "Saving to Photos"
+                )
+            )
+
+            do {
+                try await container.photoLibraryWriter.saveVideoToLibrary(at: workingAsset.localFileURL)
+                if preferences.savesToLibrary && !didSaveToLibrary {
+                    markJobReadyAfterStorageFailure(
+                        jobID: jobID,
+                        asset: workingAsset,
+                        message: "Library save failed"
+                    )
+                    banner = DownloadBanner(
+                        text: "Saved \(workingAsset.localFileURL.lastPathComponent) to Photos, but Library save failed",
+                        kind: .error
+                    )
+                    appendLog(
+                        kind: .success,
+                        title: prefixed("Saved to Photos", prefix: logPrefix),
+                        message: workingAsset.localFileURL.lastPathComponent,
+                        jobID: jobID,
+                        tweetID: request.tweetID
+                    )
+                    return
+                }
+
+                let keepsLocalFile = didSaveToLibrary || preferences.savesToLibrary
+                completeJob(id: jobID, asset: workingAsset, keepsLocalFile: keepsLocalFile)
+                if !keepsLocalFile {
+                    discardDownloadedAsset(workingAsset, tweetID: request.tweetID)
+                }
+
+                let destinationText = didSaveToLibrary ? "Library and Photos" : "Photos"
+                let suffix = libraryErrorMessage == nil ? "" : ", but Library save failed"
+                banner = DownloadBanner(
+                    text: "Saved \(workingAsset.localFileURL.lastPathComponent) to \(destinationText)\(suffix)",
+                    kind: .success
+                )
+                appendLog(
+                    kind: .success,
+                    title: prefixed("Saved to Photos", prefix: logPrefix),
+                    message: workingAsset.localFileURL.lastPathComponent,
+                    jobID: jobID,
+                    tweetID: request.tweetID
+                )
+            } catch {
+                if didSaveToLibrary {
+                    completeJob(id: jobID, asset: workingAsset, keepsLocalFile: true)
+                } else {
+                    markJobReadyAfterStorageFailure(
+                        jobID: jobID,
+                        asset: workingAsset,
+                        message: "Photos save failed"
+                    )
+                }
+                banner = DownloadBanner(
+                    text: "Downloaded \(workingAsset.localFileURL.lastPathComponent), but Photos save failed: \(error.localizedDescription)",
+                    kind: .error
+                )
+                appendLog(
+                    kind: .warning,
+                    title: prefixed("Photos save failed", prefix: logPrefix),
+                    message: error.localizedDescription,
+                    jobID: jobID,
+                    tweetID: request.tweetID
+                )
+            }
+            return
+        }
+
+        completeJob(id: jobID, asset: workingAsset, keepsLocalFile: didSaveToLibrary)
+        banner = DownloadBanner(
+            text: "Saved \(workingAsset.localFileURL.lastPathComponent) to Library",
+            kind: .success
+        )
+        appendLog(
+            kind: .success,
+            title: prefixed("Saved to Library", prefix: logPrefix),
+            message: workingAsset.localFileURL.lastPathComponent,
+            jobID: jobID,
+            tweetID: request.tweetID
+        )
+    }
+
+    private func finishRecoveredBackgroundAsset(jobID: UUID, asset: DownloadedAsset) async {
+        let preferences = storagePreferences
+        var workingAsset = asset
+        var didSaveToLibrary = false
+        var didSaveToPhotos = false
+
+        if preferences.savesToLibrary {
+            let outcome = storeAssetInLibrary(asset, request: nil)
+            workingAsset = outcome.asset
+            didSaveToLibrary = outcome.didSave
+            if let errorMessage = outcome.errorMessage {
+                appendLog(
+                    kind: .warning,
+                    title: "Recovered Library save failed",
+                    message: errorMessage,
+                    jobID: jobID,
+                    tweetID: asset.sourceTweetID
+                )
+            }
+        }
+
+        if preferences.savesToPhotos {
+            do {
+                try await container.photoLibraryWriter.saveVideoToLibrary(at: workingAsset.localFileURL)
+                didSaveToPhotos = true
+                appendLog(
+                    kind: .success,
+                    title: "Recovered Photos save",
+                    message: workingAsset.localFileURL.lastPathComponent,
+                    jobID: jobID,
+                    tweetID: asset.sourceTweetID
+                )
+            } catch {
+                appendLog(
+                    kind: .warning,
+                    title: "Recovered Photos save failed",
+                    message: error.localizedDescription,
+                    jobID: jobID,
+                    tweetID: asset.sourceTweetID
+                )
+            }
+        }
+
+        if didSaveToPhotos && !didSaveToLibrary {
+            discardRecoveredAsset(workingAsset)
+        }
+
+        if didSaveToLibrary || didSaveToPhotos {
+            let destinationText: String
+            switch (didSaveToLibrary, didSaveToPhotos) {
+            case (true, true):
+                destinationText = "Library and Photos"
+            case (true, false):
+                destinationText = "Library"
+            case (false, true):
+                destinationText = "Photos"
+            case (false, false):
+                destinationText = "nowhere"
+            }
+            banner = DownloadBanner(
+                text: "Recovered background download to \(destinationText)",
+                kind: .success
+            )
+            appendLog(
+                kind: .warning,
+                title: "Recovered orphan download",
+                message: workingAsset.localFileURL.lastPathComponent,
+                jobID: jobID,
+                tweetID: asset.sourceTweetID
+            )
+            return
+        }
+
+        let didDiscard = discardRecoveredAsset(workingAsset)
+        banner = DownloadBanner(
+            text: didDiscard
+                ? "Background download recovery failed; discarded \(workingAsset.localFileURL.lastPathComponent)"
+                : "Background download recovery failed, and cleanup failed",
+            kind: .error
+        )
+        appendLog(
+            kind: .error,
+            title: didDiscard ? "Discarded orphan download" : "Orphan cleanup failed",
+            message: workingAsset.localFileURL.lastPathComponent,
+            jobID: jobID,
+            tweetID: asset.sourceTweetID
+        )
+    }
+
+    private func prefixed(_ title: String, prefix: String?) -> String {
+        guard let prefix = prefix else {
+            return title
+        }
+        return "\(prefix) \(title)"
+    }
+
     private func updateJob(
         id: UUID,
         persist: Bool = true,
@@ -753,6 +901,108 @@ final class DownloadCenter: ObservableObject {
         job.totalBytes = asset.fileSize
         job.speedBytesPerSecond = nil
         job.etaSeconds = nil
+    }
+
+    private func applyDownloadedAsset(
+        _ asset: DownloadedAsset,
+        to job: inout DownloadJob,
+        keepsLocalFile: Bool
+    ) {
+        applyDownloadedAsset(asset, to: &job)
+        if !keepsLocalFile {
+            job.localFileURL = nil
+        }
+    }
+
+    private func completeJob(
+        id jobID: UUID,
+        asset: DownloadedAsset,
+        keepsLocalFile: Bool
+    ) {
+        updateJob(id: jobID) { job in
+            applyDownloadedAsset(asset, to: &job, keepsLocalFile: keepsLocalFile)
+            job.phase = .completed
+            job.progress = 1
+            if job.totalSegmentCount != nil {
+                job.completedSegmentCount = job.totalSegmentCount
+            }
+            job.progressMessage = nil
+            job.errorMessage = nil
+        }
+    }
+
+    private func markJobReadyAfterStorageFailure(
+        jobID: UUID,
+        asset: DownloadedAsset,
+        message: String
+    ) {
+        updateJob(id: jobID) { job in
+            applyDownloadedAsset(asset, to: &job)
+            job.phase = .ready
+            job.progress = 1
+            job.errorMessage = message
+            job.progressMessage = "Downloaded, but \(message)"
+        }
+    }
+
+    private func storeAssetInLibrary(
+        _ asset: DownloadedAsset,
+        request: TweetRequest?
+    ) -> LibraryStorageOutcome {
+        do {
+            let libraryAsset = try moveAssetToLibrary(asset)
+            let didRecord: Bool
+            if let request = request {
+                didRecord = recordLibraryItem(asset: libraryAsset, request: request)
+            } else {
+                didRecord = recordRecoveredLibraryItem(asset: libraryAsset)
+            }
+            guard didRecord else {
+                return LibraryStorageOutcome(
+                    asset: libraryAsset,
+                    didSave: false,
+                    errorMessage: "Library save failed"
+                )
+            }
+            return LibraryStorageOutcome(asset: libraryAsset, didSave: true, errorMessage: nil)
+        } catch {
+            return LibraryStorageOutcome(
+                asset: asset,
+                didSave: false,
+                errorMessage: error.localizedDescription
+            )
+        }
+    }
+
+    private func moveAssetToLibrary(_ asset: DownloadedAsset) throws -> DownloadedAsset {
+        let sourceURL = asset.localFileURL
+        try fileManager.createDirectory(at: downloadsDirectory, withIntermediateDirectories: true)
+
+        if sourceURL.deletingLastPathComponent().standardizedFileURL
+            == downloadsDirectory.standardizedFileURL
+        {
+            return asset
+        }
+
+        let fileExtension = sourceURL.pathExtension.isEmpty
+            ? DownloadFileNaming.fileExtension(for: asset.format, mimeType: asset.responseMimeType)
+            : sourceURL.pathExtension
+        let destinationURL = DownloadFileNaming.uniqueDestinationURL(
+            in: downloadsDirectory,
+            baseName: sourceURL.deletingPathExtension().lastPathComponent,
+            ext: fileExtension
+        ) { path in
+            fileManager.fileExists(atPath: path)
+        }
+
+        do {
+            try fileManager.moveItem(at: sourceURL, to: destinationURL)
+        } catch {
+            try fileManager.copyItem(at: sourceURL, to: destinationURL)
+            try? fileManager.removeItem(at: sourceURL)
+        }
+
+        return asset.replacingLocalFileURL(destinationURL, fileManager: fileManager)
     }
 
     private func persistJob(_ job: DownloadJob) {
@@ -816,10 +1066,6 @@ final class DownloadCenter: ObservableObject {
             banner = DownloadBanner(text: "Delete failed: \(error.localizedDescription)", kind: .error)
             appendLog(kind: .error, title: "Delete failed", message: error.localizedDescription, tweetID: item.sourceTweetID)
         }
-    }
-
-    func reloadLibrary() {
-        libraryItems = Self.loadLibraryItems(fileManager: fileManager)
     }
 
     private func appendLog(
@@ -1003,6 +1249,10 @@ final class DownloadCenter: ObservableObject {
         Self.downloadsDirectory(fileManager: fileManager)
     }
 
+    private var stagingDownloadsDirectory: URL {
+        Self.stagingDownloadsDirectory(fileManager: fileManager)
+    }
+
     private var libraryDirectory: URL {
         Self.libraryDirectory(fileManager: fileManager)
     }
@@ -1015,6 +1265,14 @@ final class DownloadCenter: ObservableObject {
         documentsDirectory(fileManager: fileManager)
             .appendingPathComponent("SaveX", isDirectory: true)
             .appendingPathComponent("Downloads", isDirectory: true)
+    }
+
+    private static func stagingDownloadsDirectory(fileManager: FileManager) -> URL {
+        let cacheDirectory = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first
+            ?? fileManager.temporaryDirectory
+        return cacheDirectory
+            .appendingPathComponent("SaveX", isDirectory: true)
+            .appendingPathComponent("StagingDownloads", isDirectory: true)
     }
 
     private static func libraryDirectory(fileManager: FileManager) -> URL {
@@ -1031,6 +1289,20 @@ final class DownloadCenter: ObservableObject {
     private static func libraryManifestURL(fileManager: FileManager) -> URL {
         libraryDirectory(fileManager: fileManager)
             .appendingPathComponent("library.json", isDirectory: false)
+    }
+}
+
+private extension DownloadedAsset {
+    func replacingLocalFileURL(_ localFileURL: URL, fileManager: FileManager) -> DownloadedAsset {
+        let attributes = try? fileManager.attributesOfItem(atPath: localFileURL.path)
+        let fileSize = (attributes?[.size] as? NSNumber)?.int64Value ?? self.fileSize
+        return DownloadedAsset(
+            sourceTweetID: sourceTweetID,
+            format: format,
+            localFileURL: localFileURL,
+            fileSize: fileSize,
+            responseMimeType: responseMimeType
+        )
     }
 }
 

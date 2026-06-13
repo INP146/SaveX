@@ -156,7 +156,6 @@ private final class ConsoleScrollView: UIScrollView {
     private func setup() {
         backgroundColor = .clear
         isOpaque = false
-        overrideUserInterfaceStyle = .dark
         alwaysBounceVertical = true
         alwaysBounceHorizontal = true
         showsHorizontalScrollIndicator = false
@@ -166,7 +165,6 @@ private final class ConsoleScrollView: UIScrollView {
 
         textView.backgroundColor = .clear
         textView.isOpaque = false
-        textView.overrideUserInterfaceStyle = .dark
         textView.isEditable = false
         textView.isSelectable = true
         textView.isScrollEnabled = false
@@ -264,12 +262,41 @@ private extension DownloadLogEntry.Kind {
 }
 
 private extension UIColor {
-    static let logText = UIColor(white: 0.96, alpha: 1)
-    static let logMeta = UIColor(white: 0.68, alpha: 1)
-    static let logBlue = UIColor(red: 0.22, green: 0.62, blue: 1.00, alpha: 1)
-    static let logGreen = UIColor(red: 0.18, green: 0.86, blue: 0.42, alpha: 1)
-    static let logOrange = UIColor(red: 1.00, green: 0.68, blue: 0.20, alpha: 1)
-    static let logRed = UIColor(red: 1.00, green: 0.32, blue: 0.36, alpha: 1)
+    static let logText = UIColor { traitCollection in
+        traitCollection.userInterfaceStyle == .dark
+            ? UIColor(white: 0.96, alpha: 1)
+            : UIColor(white: 0.12, alpha: 1)
+    }
+
+    static let logMeta = UIColor { traitCollection in
+        traitCollection.userInterfaceStyle == .dark
+            ? UIColor(white: 0.68, alpha: 1)
+            : UIColor(white: 0.42, alpha: 1)
+    }
+
+    static let logBlue = UIColor { traitCollection in
+        traitCollection.userInterfaceStyle == .dark
+            ? UIColor(red: 0.22, green: 0.62, blue: 1.00, alpha: 1)
+            : UIColor(red: 0.00, green: 0.34, blue: 0.78, alpha: 1)
+    }
+
+    static let logGreen = UIColor { traitCollection in
+        traitCollection.userInterfaceStyle == .dark
+            ? UIColor(red: 0.18, green: 0.86, blue: 0.42, alpha: 1)
+            : UIColor(red: 0.00, green: 0.45, blue: 0.16, alpha: 1)
+    }
+
+    static let logOrange = UIColor { traitCollection in
+        traitCollection.userInterfaceStyle == .dark
+            ? UIColor(red: 1.00, green: 0.68, blue: 0.20, alpha: 1)
+            : UIColor(red: 0.72, green: 0.36, blue: 0.00, alpha: 1)
+    }
+
+    static let logRed = UIColor { traitCollection in
+        traitCollection.userInterfaceStyle == .dark
+            ? UIColor(red: 1.00, green: 0.32, blue: 0.36, alpha: 1)
+            : UIColor(red: 0.75, green: 0.06, blue: 0.12, alpha: 1)
+    }
 }
 
 #Preview("Logs") {

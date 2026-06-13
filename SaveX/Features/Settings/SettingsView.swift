@@ -4,8 +4,11 @@ import UIKit
 struct SettingsView: View {
     @ObservedObject var cookieStore: TwitterCookieStore
 
-    @AppStorage("SaveX.defaultDownloadRoute") private var defaultRouteRaw = QualityPreset.best
+    @AppStorage(SaveXStorageKey.defaultDownloadRoute) private var defaultRouteRaw = QualityPreset
+        .best
         .rawValue
+    @AppStorage(SaveXStorageKey.savesDownloadsToLibrary) private var savesDownloadsToLibrary = true
+    @AppStorage(SaveXStorageKey.savesDownloadsToPhotos) private var savesDownloadsToPhotos = true
     @State private var cookieDraft = ""
     @State private var cookieValidationMessage = ""
     @State private var showsCookieValidationAlert = false
@@ -19,24 +22,7 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 18) {
                         header
 
-                        GlassPanel {
-                            VStack(alignment: .leading, spacing: 14) {
-                                Text("Download policy")
-                                    .font(.headline)
-
-                                Picker("Default route", selection: defaultRouteBinding) {
-                                    ForEach(QualityPreset.allCases) { quality in
-                                        Text(quality.label)
-                                            .tag(quality)
-                                    }
-                                }
-                                .pickerStyle(.segmented)
-
-                                Text(defaultRoute.helpText)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
+                        preferencesPanel
 
                         GlassPanel {
                             VStack(alignment: .leading, spacing: 14) {
@@ -52,9 +38,11 @@ struct SettingsView: View {
                                 }
 
                                 if cookieStore.hasCookie {
-                                    Text("Cookie is stored in Keychain and will be sent only to Twitter/X requests.")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
+                                    Text(
+                                        "Cookie is stored in Keychain and will be sent only to Twitter/X requests."
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
 
                                     Button(role: .destructive) {
                                         cookieStore.clear()
@@ -115,8 +103,10 @@ struct SettingsView: View {
                                         }
                                         .buttonStyle(.glassProminent)
                                         .disabled(
-                                            cookieDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-                                                .isEmpty)
+                                            cookieDraft.trimmingCharacters(
+                                                in: .whitespacesAndNewlines
+                                            )
+                                            .isEmpty)
                                     }
                                     .frame(maxWidth: .infinity)
                                 }
@@ -133,6 +123,7 @@ struct SettingsView: View {
             }
             .saveXNavigationChrome()
             .onAppear {
+                normalizeSaveDestinations()
                 cookieDraft = ""
             }
             .alert("Cookie cannot be saved", isPresented: $showsCookieValidationAlert) {
@@ -149,6 +140,49 @@ struct SettingsView: View {
             .padding(.top, 12)
     }
 
+    private var preferencesPanel: some View {
+        GlassPanel {
+            VStack(alignment: .leading, spacing: 16) {
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Download policy")
+                        .font(.subheadline.weight(.semibold))
+
+                    Picker("Default route", selection: defaultRouteBinding) {
+                        ForEach(QualityPreset.allCases) { quality in
+                            Text(quality.label)
+                                .tag(quality)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    Text(defaultRoute.helpText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Divider()
+                    .opacity(0.45)
+
+                VStack(alignment: .leading, spacing: 12) {
+                    preferenceToggle(
+                        title: "Save to Library",
+                        subtitle: "Keep a local copy in SaveX Library.",
+                        systemImage: "books.vertical.fill",
+                        isOn: saveToLibraryBinding
+                    )
+
+                    preferenceToggle(
+                        title: "Save to Photos",
+                        subtitle: "Add completed videos to your photo album.",
+                        systemImage: "photo.on.rectangle.angled",
+                        isOn: saveToPhotosBinding
+                    )
+                }
+            }
+        }
+    }
+
     private var defaultRoute: QualityPreset {
         QualityPreset(rawValue: defaultRouteRaw) ?? .best
     }
@@ -160,6 +194,66 @@ struct SettingsView: View {
         )
     }
 
+    private var saveToLibraryBinding: Binding<Bool> {
+        Binding(
+            get: { savesDownloadsToLibrary },
+            set: { newValue in
+                if newValue {
+                    savesDownloadsToLibrary = true
+                } else if savesDownloadsToPhotos {
+                    savesDownloadsToLibrary = false
+                } else {
+                    savesDownloadsToLibrary = false
+                    savesDownloadsToPhotos = true
+                }
+            }
+        )
+    }
+
+    private var saveToPhotosBinding: Binding<Bool> {
+        Binding(
+            get: { savesDownloadsToPhotos },
+            set: { newValue in
+                if newValue {
+                    savesDownloadsToPhotos = true
+                } else if savesDownloadsToLibrary {
+                    savesDownloadsToPhotos = false
+                } else {
+                    savesDownloadsToPhotos = false
+                    savesDownloadsToLibrary = true
+                }
+            }
+        )
+    }
+
+    private func preferenceToggle(
+        title: String,
+        subtitle: String,
+        systemImage: String,
+        isOn: Binding<Bool>
+    ) -> some View {
+        Toggle(isOn: isOn) {
+            Label {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.subheadline.weight(.semibold))
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } icon: {
+                Image(systemName: systemImage)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func normalizeSaveDestinations() {
+        if !savesDownloadsToLibrary && !savesDownloadsToPhotos {
+            savesDownloadsToLibrary = true
+        }
+    }
+
     private func saveCookieDraft() {
         let jar = TwitterCookieJar(rawHeader: cookieDraft)
         let blockingIssues = jar.validationIssues.filter { issue in
@@ -167,7 +261,8 @@ struct SettingsView: View {
         }
 
         guard blockingIssues.isEmpty else {
-            cookieValidationMessage = blockingIssues
+            cookieValidationMessage =
+                blockingIssues
                 .map(\.label)
                 .joined(separator: "\n")
             showsCookieValidationAlert = true

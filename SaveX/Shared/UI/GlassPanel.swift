@@ -70,9 +70,18 @@ extension View {
         )
     }
 
-    func saveXGlassIcon() -> some View {
+    func saveXGlassIcon(diameter: CGFloat = SaveXGlassButtonMetrics.iconDiameter) -> some View {
         font(.headline)
-            .frame(width: SaveXGlassButtonMetrics.iconDiameter, height: SaveXGlassButtonMetrics.iconDiameter)
+            .frame(width: diameter, height: diameter)
+            .glassEffect(.regular.interactive(), in: Circle())
+            .contentShape(Circle())
+    }
+
+    func saveXGlassProminentIcon(diameter: CGFloat = SaveXGlassButtonMetrics.iconDiameter) -> some View {
+        font(.headline)
+            .foregroundStyle(.white)
+            .frame(width: diameter, height: diameter)
+            .background(Circle().fill(Color.accentColor))
             .glassEffect(.regular.interactive(), in: Circle())
             .contentShape(Circle())
     }

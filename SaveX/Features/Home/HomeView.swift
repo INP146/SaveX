@@ -5,7 +5,7 @@ struct HomeView: View {
     @ObservedObject var downloadCenter: DownloadCenter
 
     @State private var tweetURL = ""
-    @AppStorage("SaveX.defaultDownloadRoute") private var preferredQualityRaw = QualityPreset.best
+    @AppStorage(SaveXStorageKey.defaultDownloadRoute) private var preferredQualityRaw = QualityPreset.best
         .rawValue
 
     var body: some View {
