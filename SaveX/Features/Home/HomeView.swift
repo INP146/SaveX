@@ -25,7 +25,7 @@ struct HomeView: View {
                     .offset(y: -proxy.size.height * 0.02)
                 }
             }
-            .toolbarTitleDisplayMode(.inline)
+            .saveXNavigationChrome()
         }
     }
 
@@ -62,6 +62,7 @@ struct HomeView: View {
                         }
                     } label: {
                         Label("Paste", systemImage: "doc.on.clipboard")
+                            .saveXGlassLabel()
                     }
                     .buttonStyle(.glass)
 
@@ -75,7 +76,7 @@ struct HomeView: View {
                         }
                     } label: {
                         Label("Queue", systemImage: "arrow.down.circle.fill")
-                            .frame(maxWidth: .infinity)
+                            .saveXGlassLabel(expands: true)
                     }
                     .buttonStyle(.glassProminent)
                     .disabled(tweetURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)

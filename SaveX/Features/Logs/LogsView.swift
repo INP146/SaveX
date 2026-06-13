@@ -19,9 +19,9 @@ struct LogsView: View {
                         logConsole
                     }
                 }
-                .padding(20)
+                .padding(SaveXPageLayout.standardInsets)
             }
-            .toolbarTitleDisplayMode(.inline)
+            .saveXNavigationChrome()
         }
     }
 
@@ -36,8 +36,7 @@ struct LogsView: View {
                 UIPasteboard.general.string = logText
             } label: {
                 Image(systemName: "doc.on.doc")
-                    .font(.headline)
-                    .frame(width: 42, height: 42)
+                    .saveXGlassIcon()
             }
             .buttonStyle(.glass)
             .disabled(downloadCenter.logs.isEmpty)
@@ -47,8 +46,7 @@ struct LogsView: View {
                 downloadCenter.clearLogs()
             } label: {
                 Image(systemName: "trash")
-                    .font(.headline)
-                    .frame(width: 42, height: 42)
+                    .saveXGlassIcon()
             }
             .buttonStyle(.glass)
             .disabled(downloadCenter.logs.isEmpty)

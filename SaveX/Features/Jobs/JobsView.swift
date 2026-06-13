@@ -8,7 +8,7 @@ struct JobsView: View {
             ZStack {
                 SaveXBackground()
 
-                ScrollView {
+                StablePageScrollView {
                     VStack(alignment: .leading, spacing: 18) {
                         header
 
@@ -26,10 +26,9 @@ struct JobsView: View {
                             }
                         }
                     }
-                    .padding(20)
                 }
             }
-            .toolbarTitleDisplayMode(.inline)
+            .saveXNavigationChrome()
         }
     }
 
@@ -95,29 +94,9 @@ private struct JobRow: View {
                 .foregroundStyle(job.phase == .failed ? .red : .secondary)
 
                 HStack(spacing: 10) {
-                    if canPause {
-                        Button(action: pause) {
-                            Label("Pause", systemImage: "pause.fill")
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(.orange)
-                    }
+                    primaryActionButton
 
-                    if job.phase == .paused {
-                        Button(action: resume) {
-                            Label("Continue", systemImage: "play.fill")
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(.blue)
-                    }
-
-                    if job.phase == .failed {
-                        Button(action: retry) {
-                            Label("Retry", systemImage: "arrow.clockwise")
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(.blue)
-                    }
+                    Spacer(minLength: 10)
 
                     Button(role: .destructive, action: delete) {
                         Label("Delete", systemImage: "trash")
@@ -126,6 +105,29 @@ private struct JobRow: View {
                 }
                 .font(.caption.weight(.semibold))
             }
+        }
+    }
+
+    @ViewBuilder
+    private var primaryActionButton: some View {
+        if canPause {
+            Button(action: pause) {
+                Label("Pause", systemImage: "pause.fill")
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.orange)
+        } else if job.phase == .paused {
+            Button(action: resume) {
+                Label("Continue", systemImage: "play.fill")
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.blue)
+        } else if job.phase == .failed {
+            Button(action: retry) {
+                Label("Retry", systemImage: "arrow.clockwise")
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.blue)
         }
     }
 

@@ -7,13 +7,15 @@ struct SettingsView: View {
     @AppStorage("SaveX.defaultDownloadRoute") private var defaultRouteRaw = QualityPreset.best
         .rawValue
     @State private var cookieDraft = ""
+    @State private var cookieValidationMessage = ""
+    @State private var showsCookieValidationAlert = false
 
     var body: some View {
         NavigationStack {
             ZStack {
                 SaveXBackground()
 
-                ScrollView {
+                StablePageScrollView {
                     VStack(alignment: .leading, spacing: 18) {
                         header
 
@@ -49,85 +51,74 @@ struct SettingsView: View {
                                             : "person.crop.circle")
                                 }
 
-                                Text(
-                                    "Advanced: paste a Cookie header from an account you control. SaveX stores it in Keychain and sends it only to Twitter/X requests."
-                                )
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-
-                                ZStack(alignment: .topLeading) {
-                                    TextEditor(text: $cookieDraft)
-                                        .textInputAutocapitalization(.never)
-                                        .autocorrectionDisabled()
-                                        .font(.footnote.monospaced())
-                                        .frame(minHeight: 110)
-                                        .padding(10)
-                                        .scrollContentBackground(.hidden)
-
-                                    if cookieDraft.isEmpty {
-                                        Text("Paste Cookie: auth_token=...; ct0=...; ...")
-                                            .font(.footnote.monospaced())
-                                            .foregroundStyle(.secondary)
-                                            .padding(.horizontal, 15)
-                                            .padding(.vertical, 18)
-                                            .allowsHitTesting(false)
-                                    }
-                                }
-                                .background(
-                                    .thinMaterial,
-                                    in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-
-                                HStack(spacing: 12) {
-                                    Button {
-                                        if let clipboard = UIPasteboard.general.string?
-                                            .trimmingCharacters(in: .whitespacesAndNewlines),
-                                            !clipboard.isEmpty
-                                        {
-                                            cookieDraft = clipboard
-                                        }
-                                    } label: {
-                                        Label("Paste", systemImage: "doc.on.clipboard")
-                                    }
-                                    .buttonStyle(.glass)
+                                if cookieStore.hasCookie {
+                                    Text("Cookie is stored in Keychain and will be sent only to Twitter/X requests.")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
 
                                     Button(role: .destructive) {
                                         cookieStore.clear()
                                         cookieDraft = ""
                                     } label: {
                                         Label("Clear", systemImage: "trash")
+                                            .saveXGlassLabel(expands: true)
                                     }
                                     .buttonStyle(.glass)
+                                } else {
+                                    Text(
+                                        "Advanced: paste a Cookie header from an account you control. SaveX stores it in Keychain and sends it only to Twitter/X requests."
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
 
-                                    Button {
-                                        cookieStore.update(cookieHeader: cookieDraft)
-                                        cookieDraft = ""
-                                    } label: {
-                                        Label("Save", systemImage: "checkmark.circle.fill")
-                                            .frame(maxWidth: .infinity)
-                                    }
-                                    .buttonStyle(.glassProminent)
-                                    .disabled(
-                                        cookieDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-                                            .isEmpty)
-                                }
+                                    ZStack(alignment: .topLeading) {
+                                        TextEditor(text: $cookieDraft)
+                                            .textInputAutocapitalization(.never)
+                                            .autocorrectionDisabled()
+                                            .font(.footnote.monospaced())
+                                            .frame(minHeight: 110)
+                                            .padding(10)
+                                            .scrollContentBackground(.hidden)
 
-                                SettingRow(
-                                    title: "auth_token",
-                                    value: cookieStore.cookieValue(named: "auth_token") == nil
-                                        ? "Missing" : "Present")
-                                SettingRow(
-                                    title: "ct0",
-                                    value: cookieStore.cookieValue(named: "ct0") == nil
-                                        ? "Missing" : "Present")
-
-                                if !cookieStore.validationIssues.isEmpty, cookieStore.hasCookie {
-                                    VStack(alignment: .leading, spacing: 6) {
-                                        ForEach(cookieStore.validationIssues) { issue in
-                                            Label(issue.label, systemImage: "exclamationmark.triangle")
-                                                .font(.caption)
-                                                .foregroundStyle(.orange)
+                                        if cookieDraft.isEmpty {
+                                            Text("Paste Cookie: auth_token=...; ct0=...; ...")
+                                                .font(.footnote.monospaced())
+                                                .foregroundStyle(.secondary)
+                                                .padding(.horizontal, 15)
+                                                .padding(.vertical, 18)
+                                                .allowsHitTesting(false)
                                         }
                                     }
+                                    .background(
+                                        .thinMaterial,
+                                        in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+                                    HStack(spacing: 12) {
+                                        Button {
+                                            if let clipboard = UIPasteboard.general.string?
+                                                .trimmingCharacters(in: .whitespacesAndNewlines),
+                                                !clipboard.isEmpty
+                                            {
+                                                cookieDraft = clipboard
+                                            }
+                                        } label: {
+                                            Label("Paste", systemImage: "doc.on.clipboard")
+                                                .saveXGlassLabel()
+                                        }
+                                        .buttonStyle(.glass)
+
+                                        Button {
+                                            saveCookieDraft()
+                                        } label: {
+                                            Label("Save", systemImage: "checkmark.circle.fill")
+                                                .saveXGlassLabel(expands: true)
+                                        }
+                                        .buttonStyle(.glassProminent)
+                                        .disabled(
+                                            cookieDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+                                                .isEmpty)
+                                    }
+                                    .frame(maxWidth: .infinity)
                                 }
 
                                 if let error = cookieStore.lastStorageError {
@@ -138,12 +129,16 @@ struct SettingsView: View {
                             }
                         }
                     }
-                    .padding(20)
                 }
             }
-            .toolbarTitleDisplayMode(.inline)
+            .saveXNavigationChrome()
             .onAppear {
                 cookieDraft = ""
+            }
+            .alert("Cookie cannot be saved", isPresented: $showsCookieValidationAlert) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(cookieValidationMessage)
             }
         }
     }
@@ -164,20 +159,23 @@ struct SettingsView: View {
             set: { defaultRouteRaw = $0.rawValue }
         )
     }
-}
 
-private struct SettingRow: View {
-    let title: String
-    let value: String
-
-    var body: some View {
-        HStack {
-            Text(title)
-            Spacer()
-            Text(value)
-                .foregroundStyle(.secondary)
+    private func saveCookieDraft() {
+        let jar = TwitterCookieJar(rawHeader: cookieDraft)
+        let blockingIssues = jar.validationIssues.filter { issue in
+            issue != .malformedCookiePair
         }
-        .font(.subheadline)
+
+        guard blockingIssues.isEmpty else {
+            cookieValidationMessage = blockingIssues
+                .map(\.label)
+                .joined(separator: "\n")
+            showsCookieValidationAlert = true
+            return
+        }
+
+        cookieStore.update(cookieHeader: jar.header)
+        cookieDraft = ""
     }
 }
 

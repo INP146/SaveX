@@ -36,6 +36,7 @@ struct AppRouter: View {
                     Label("Settings", systemImage: "gearshape.fill")
                 }
         }
+        .saveXKeyboardDismissOverlay()
         .tabBarMinimizeBehavior(.onScrollDown)
         .task {
             await downloadCenter.prepareCapabilities()

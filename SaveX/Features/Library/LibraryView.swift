@@ -10,7 +10,7 @@ struct LibraryView: View {
             ZStack {
                 SaveXBackground()
 
-                ScrollView {
+                StablePageScrollView {
                     VStack(alignment: .leading, spacing: 18) {
                         header
 
@@ -27,18 +27,9 @@ struct LibraryView: View {
                             }
                         }
                     }
-                    .padding(20)
                 }
             }
-            .toolbarTitleDisplayMode(.inline)
-            .toolbar {
-                Button {
-                    downloadCenter.reloadLibrary()
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                }
-                .accessibilityLabel("Reload library")
-            }
+            .saveXNavigationChrome()
             .sheet(item: $selectedItem) { item in
                 LibraryPlayerView(url: downloadCenter.fileURL(for: item), title: item.title)
             }
@@ -46,9 +37,22 @@ struct LibraryView: View {
     }
 
     private var header: some View {
-        Text("Library")
-            .font(.system(size: 34, weight: .bold, design: .rounded))
-            .padding(.top, 12)
+        HStack(alignment: .firstTextBaseline) {
+            Text("Library")
+                .font(.system(size: 34, weight: .bold, design: .rounded))
+
+            Spacer()
+
+            Button {
+                downloadCenter.reloadLibrary()
+            } label: {
+                Image(systemName: "arrow.clockwise")
+                    .saveXGlassIcon()
+            }
+            .buttonStyle(.glass)
+            .accessibilityLabel("Reload library")
+        }
+        .padding(.top, 12)
     }
 
     private var emptyState: some View {
@@ -101,23 +105,26 @@ private struct LibraryRow: View {
                 HStack(spacing: 12) {
                     Button(action: play) {
                         Label("Play", systemImage: "play.circle.fill")
-                            .frame(maxWidth: .infinity)
+                            .saveXGlassLabel(expands: true)
                     }
                     .buttonStyle(.glassProminent)
                     .disabled(!FileManager.default.fileExists(atPath: fileURL.path))
 
                     ShareLink(item: fileURL) {
                         Label("Share", systemImage: "square.and.arrow.up")
+                            .saveXGlassLabel(expands: true)
                     }
                     .buttonStyle(.glass)
                     .disabled(!FileManager.default.fileExists(atPath: fileURL.path))
 
                     Button(role: .destructive, action: delete) {
                         Image(systemName: "trash")
+                            .saveXGlassIcon()
                     }
                     .buttonStyle(.glass)
                     .accessibilityLabel("Delete")
                 }
+                .frame(maxWidth: .infinity)
             }
         }
     }
