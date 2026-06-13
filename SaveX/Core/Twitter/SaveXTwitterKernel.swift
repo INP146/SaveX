@@ -1,4 +1,13 @@
+import Combine
 import Foundation
+
+private extension NSLock {
+    func withLock<T>(_ body: () -> T) -> T {
+        lock()
+        defer { unlock() }
+        return body()
+    }
+}
 
 struct TwitterAPIConfiguration {
     struct GraphQLQuery: Encodable {
@@ -126,12 +135,73 @@ protocol TwitterAuthProviding: Sendable {
     func sessionHeaders() -> [String: String]
 }
 
+final class TwitterCookieStore: ObservableObject, @unchecked Sendable {
+    @Published private(set) var cookieHeader: String
+
+    private let defaults: UserDefaults
+    private let defaultsKey = "SaveX.twitter.cookieHeader"
+    private let lock = NSLock()
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        self.cookieHeader = defaults.string(forKey: defaultsKey) ?? ""
+    }
+
+    var hasCookie: Bool {
+        !currentCookieHeader().isEmpty
+    }
+
+    func currentCookieHeader() -> String {
+        lock.withLock {
+            cookieHeader.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+    }
+
+    func update(cookieHeader: String) {
+        let trimmed = cookieHeader.trimmingCharacters(in: .whitespacesAndNewlines)
+        lock.withLock {
+            self.cookieHeader = trimmed
+            defaults.set(trimmed, forKey: defaultsKey)
+        }
+    }
+
+    func clear() {
+        lock.withLock {
+            cookieHeader = ""
+            defaults.removeObject(forKey: defaultsKey)
+        }
+    }
+
+    func cookieValue(named name: String) -> String? {
+        Self.cookieValue(named: name, in: currentCookieHeader())
+    }
+
+    private static func cookieValue(named name: String, in header: String) -> String? {
+        header
+            .split(separator: ";")
+            .compactMap { part -> (String, String)? in
+                let pieces = part.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
+                guard pieces.count == 2 else {
+                    return nil
+                }
+                let key = pieces[0].trimmingCharacters(in: .whitespacesAndNewlines)
+                let value = pieces[1].trimmingCharacters(in: .whitespacesAndNewlines)
+                return (key, value)
+            }
+            .first { key, _ in key == name }?
+            .1
+    }
+}
+
 struct DefaultTwitterAuthProvider: TwitterAuthProviding {
-    let authToken: String?
-    let csrfToken: String?
+    let cookieStore: TwitterCookieStore?
+
+    init(cookieStore: TwitterCookieStore? = nil) {
+        self.cookieStore = cookieStore
+    }
 
     var isLoggedIn: Bool {
-        !(authToken?.isEmpty ?? true)
+        !(cookieStore?.cookieValue(named: "auth_token")?.isEmpty ?? true)
     }
 
     func baseHeaders(legacy: Bool) -> [String: String] {
@@ -142,7 +212,11 @@ struct DefaultTwitterAuthProvider: TwitterAuthProviding {
         var headers = [
             "Authorization": "Bearer \(bearer)"
         ]
-        if let csrfToken, !csrfToken.isEmpty {
+
+        if let cookieHeader = cookieStore?.currentCookieHeader(), !cookieHeader.isEmpty {
+            headers["Cookie"] = cookieHeader
+        }
+        if let csrfToken = cookieStore?.cookieValue(named: "ct0"), !csrfToken.isEmpty {
             headers["x-csrf-token"] = csrfToken
         }
         return headers
@@ -272,12 +346,16 @@ actor TwitterAPIClient {
 
     init(
         session: URLSession = .shared,
-        authProvider: any TwitterAuthProviding = DefaultTwitterAuthProvider(authToken: nil, csrfToken: nil),
+        authProvider: any TwitterAuthProviding = DefaultTwitterAuthProvider(),
         guestTokenStore: GuestTokenStore = GuestTokenStore()
     ) {
         self.session = session
         self.authProvider = authProvider
         self.guestTokenStore = guestTokenStore
+    }
+
+    func isLoggedIn() -> Bool {
+        authProvider.isLoggedIn
     }
 
     func fetchStatus(tweetID: String, mode: TwitterAPISelection = .graphql) async throws -> JSONDictionary {

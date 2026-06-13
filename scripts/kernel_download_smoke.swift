@@ -4,7 +4,7 @@ import Foundation
 struct SaveXKernelDownloadSmokeMain {
     static func main() async {
         let parser = TwitterURLParser()
-        let authProvider = DefaultTwitterAuthProvider(authToken: nil, csrfToken: nil)
+        let authProvider = DefaultTwitterAuthProvider()
         let apiClient = TwitterAPIClient(authProvider: authProvider)
         let extractor = TwitterMediaExtractor()
         let selector = FormatSelector()

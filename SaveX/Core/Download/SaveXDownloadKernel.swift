@@ -109,8 +109,10 @@ actor DownloadEngine {
             }
         }
 
+        let isLoggedIn = await apiClient.isLoggedIn()
         var recoverableError: Error?
         for mode in modes {
+            var didReturnPayload = false
             do {
                 await onTraceEvent?(.init(kind: .info, message: "Trying \(mode.rawValue) tweet source"))
                 await onProgressEvent?(.init(
@@ -120,6 +122,7 @@ actor DownloadEngine {
                     message: "Fetching tweet"
                 ))
                 let status = try await apiClient.fetchStatus(tweetID: request.tweetID, mode: mode)
+                didReturnPayload = true
 
                 await onTraceEvent?(.init(kind: .success, message: "\(mode.rawValue) returned tweet payload"))
                 await onProgressEvent?(.init(
@@ -157,7 +160,11 @@ actor DownloadEngine {
                 await onTraceEvent?(.init(kind: .success, message: "Selected format \(format.formatID)"))
                 return (entry, format)
             } catch {
-                guard Self.shouldTryNextMode(after: error) else {
+                guard Self.shouldTryNextMode(
+                    after: error,
+                    isLoggedIn: isLoggedIn,
+                    didReturnPayload: didReturnPayload
+                ) else {
                     await onTraceEvent?(.init(kind: .error, message: "\(mode.rawValue) failed: \(error.localizedDescription)"))
                     throw error
                 }
@@ -190,14 +197,18 @@ actor DownloadEngine {
         }
     }
 
-    private static func shouldTryNextMode(after error: Error) -> Bool {
+    static func shouldTryNextMode(
+        after error: Error,
+        isLoggedIn: Bool = false,
+        didReturnPayload: Bool = false
+    ) -> Bool {
         guard let saveXError = error as? SaveXError else {
             return false
         }
 
         switch saveXError {
         case .noVideoFound, .noFormatsFound, .videoUnavailable, .mediaNotVideo:
-            return true
+            return !(isLoggedIn && didReturnPayload)
         case let .apiError(_, statusCode?):
             return statusCode == 404 || statusCode == 429
         default:

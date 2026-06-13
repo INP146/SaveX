@@ -51,6 +51,27 @@ final class SaveXKernelTests: XCTestCase {
         }
     }
 
+    func testGuestModeFallsBackAfterMediaExtractionFailure() {
+        XCTAssertTrue(DownloadEngine.shouldTryNextMode(
+            after: SaveXError.noVideoFound,
+            isLoggedIn: false,
+            didReturnPayload: true
+        ))
+    }
+
+    func testLoggedInModeDoesNotFallbackAfterMediaExtractionFailure() {
+        XCTAssertFalse(DownloadEngine.shouldTryNextMode(
+            after: SaveXError.noVideoFound,
+            isLoggedIn: true,
+            didReturnPayload: true
+        ))
+        XCTAssertTrue(DownloadEngine.shouldTryNextMode(
+            after: SaveXError.apiError("", statusCode: 429),
+            isLoggedIn: true,
+            didReturnPayload: false
+        ))
+    }
+
     func testHLSParserRejectsUnsupportedCriticalTags() throws {
         let parser = HLSManifestParser()
         let baseURL = URL(string: "https://video.example.test/media/index.m3u8")!

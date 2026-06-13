@@ -2,6 +2,7 @@ import Foundation
 
 struct AppContainer {
     let urlParser: TwitterURLParser
+    let twitterCookieStore: TwitterCookieStore
     let authProvider: DefaultTwitterAuthProvider
     let apiClient: TwitterAPIClient
     let mediaExtractor: TwitterMediaExtractor
@@ -11,11 +12,13 @@ struct AppContainer {
     let networkPermissionRequester: NetworkPermissionRequester
 
     init() {
-        let authProvider = DefaultTwitterAuthProvider(authToken: nil, csrfToken: nil)
+        let twitterCookieStore = TwitterCookieStore()
+        let authProvider = DefaultTwitterAuthProvider(cookieStore: twitterCookieStore)
         let apiClient = TwitterAPIClient(authProvider: authProvider)
         let mediaExtractor = TwitterMediaExtractor()
         let formatSelector = FormatSelector()
         self.urlParser = TwitterURLParser()
+        self.twitterCookieStore = twitterCookieStore
         self.authProvider = authProvider
         self.apiClient = apiClient
         self.mediaExtractor = mediaExtractor

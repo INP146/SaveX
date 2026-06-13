@@ -31,7 +31,7 @@ struct AppRouter: View {
                     Label("Logs", systemImage: "list.bullet.rectangle")
                 }
 
-            SettingsView()
+            SettingsView(cookieStore: container.twitterCookieStore)
                 .tabItem {
                     Label("Settings", systemImage: "gearshape.fill")
                 }
