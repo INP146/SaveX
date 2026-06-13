@@ -39,31 +39,43 @@ struct SettingsView: View {
                         GlassPanel {
                             VStack(alignment: .leading, spacing: 14) {
                                 HStack {
-                                    Text("Twitter/X cookie")
+                                    Text("Twitter/X session")
                                         .font(.headline)
                                     Spacer()
                                     StatusPill(
-                                        cookieStore.hasCookie ? "Enabled" : "Guest",
+                                        cookieStore.hasCookie ? "Cookie enabled" : "Guest",
                                         systemImage: cookieStore.hasCookie
                                             ? "person.crop.circle.badge.checkmark"
                                             : "person.crop.circle")
                                 }
 
                                 Text(
-                                    "Advanced: paste a Cookie header from an account you control. It stays on this device and is sent only to Twitter/X requests."
+                                    "Advanced: paste a Cookie header from an account you control. SaveX stores it in Keychain and sends it only to Twitter/X requests."
                                 )
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
 
-                                TextEditor(text: $cookieDraft)
-                                    .textInputAutocapitalization(.never)
-                                    .autocorrectionDisabled()
-                                    .font(.footnote.monospaced())
-                                    .frame(minHeight: 110)
-                                    .padding(10)
-                                    .background(
-                                        .thinMaterial,
-                                        in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                ZStack(alignment: .topLeading) {
+                                    TextEditor(text: $cookieDraft)
+                                        .textInputAutocapitalization(.never)
+                                        .autocorrectionDisabled()
+                                        .font(.footnote.monospaced())
+                                        .frame(minHeight: 110)
+                                        .padding(10)
+                                        .scrollContentBackground(.hidden)
+
+                                    if cookieDraft.isEmpty {
+                                        Text("Paste Cookie: auth_token=...; ct0=...; ...")
+                                            .font(.footnote.monospaced())
+                                            .foregroundStyle(.secondary)
+                                            .padding(.horizontal, 15)
+                                            .padding(.vertical, 18)
+                                            .allowsHitTesting(false)
+                                    }
+                                }
+                                .background(
+                                    .thinMaterial,
+                                    in: RoundedRectangle(cornerRadius: 14, style: .continuous))
 
                                 HStack(spacing: 12) {
                                     Button {
@@ -88,6 +100,7 @@ struct SettingsView: View {
 
                                     Button {
                                         cookieStore.update(cookieHeader: cookieDraft)
+                                        cookieDraft = ""
                                     } label: {
                                         Label("Save", systemImage: "checkmark.circle.fill")
                                             .frame(maxWidth: .infinity)
@@ -106,6 +119,22 @@ struct SettingsView: View {
                                     title: "ct0",
                                     value: cookieStore.cookieValue(named: "ct0") == nil
                                         ? "Missing" : "Present")
+
+                                if !cookieStore.validationIssues.isEmpty, cookieStore.hasCookie {
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        ForEach(cookieStore.validationIssues) { issue in
+                                            Label(issue.label, systemImage: "exclamationmark.triangle")
+                                                .font(.caption)
+                                                .foregroundStyle(.orange)
+                                        }
+                                    }
+                                }
+
+                                if let error = cookieStore.lastStorageError {
+                                    Label(error, systemImage: "lock.trianglebadge.exclamationmark")
+                                        .font(.caption)
+                                        .foregroundStyle(.red)
+                                }
                             }
                         }
                     }
@@ -114,7 +143,7 @@ struct SettingsView: View {
             }
             .toolbarTitleDisplayMode(.inline)
             .onAppear {
-                cookieDraft = cookieStore.currentCookieHeader()
+                cookieDraft = ""
             }
         }
     }

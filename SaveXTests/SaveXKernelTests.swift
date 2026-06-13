@@ -72,6 +72,48 @@ final class SaveXKernelTests: XCTestCase {
         ))
     }
 
+    func testTwitterCookieJarNormalizesPastedCookieHeader() {
+        let jar = TwitterCookieJar(
+            rawHeader: "Cookie: ct0=csrf ; malformed ; auth_token=token=withEquals; empty= ; theme=dark"
+        )
+
+        XCTAssertEqual(jar.header, "ct0=csrf; auth_token=token=withEquals; theme=dark")
+        XCTAssertEqual(jar.value(named: "auth_token"), "token=withEquals")
+        XCTAssertEqual(jar.csrfToken, "csrf")
+        XCTAssertTrue(jar.isLoggedIn)
+        XCTAssertEqual(jar.validationIssues, [.malformedCookiePair])
+    }
+
+    func testTwitterCookieStorePersistsNormalizedCookieAndClears() throws {
+        let storage = InMemorySecureStringStore()
+        let store = TwitterCookieStore(storage: storage)
+
+        XCTAssertEqual(store.currentCookieHeader(), "")
+
+        store.update(cookieHeader: "Cookie: ct0=new-csrf; auth_token=new-token")
+
+        XCTAssertEqual(store.currentCookieHeader(), "ct0=new-csrf; auth_token=new-token")
+        XCTAssertEqual(try storage.read(), "ct0=new-csrf; auth_token=new-token")
+
+        store.clear()
+
+        XCTAssertEqual(store.currentCookieHeader(), "")
+        XCTAssertNil(try storage.read())
+    }
+
+    func testTwitterAuthProviderInjectsCookieBackedSessionHeaders() {
+        let storage = InMemorySecureStringStore(value: "auth_token=token; ct0=csrf")
+        let store = TwitterCookieStore(storage: storage)
+        let provider = DefaultTwitterAuthProvider(cookieStore: store)
+
+        let headers = provider.baseHeaders(legacy: false)
+
+        XCTAssertTrue(provider.isLoggedIn)
+        XCTAssertEqual(headers["Cookie"], "auth_token=token; ct0=csrf")
+        XCTAssertEqual(headers["x-csrf-token"], "csrf")
+        XCTAssertEqual(provider.sessionHeaders()["x-twitter-auth-type"], "OAuth2Session")
+    }
+
     func testHLSParserRejectsUnsupportedCriticalTags() throws {
         let parser = HLSManifestParser()
         let baseURL = URL(string: "https://video.example.test/media/index.m3u8")!
@@ -327,5 +369,32 @@ private final class TestFileManager: FileManager, @unchecked Sendable {
         default:
             return super.urls(for: directory, in: domainMask)
         }
+    }
+}
+
+private final class InMemorySecureStringStore: SecureStringStoring, @unchecked Sendable {
+    private var value: String?
+    private let lock = NSLock()
+
+    init(value: String? = nil) {
+        self.value = value
+    }
+
+    func read() throws -> String? {
+        lock.lock()
+        defer { lock.unlock() }
+        return value
+    }
+
+    func write(_ value: String) throws {
+        lock.lock()
+        defer { lock.unlock() }
+        self.value = value
+    }
+
+    func delete() throws {
+        lock.lock()
+        defer { lock.unlock() }
+        value = nil
     }
 }
