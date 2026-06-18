@@ -4,12 +4,14 @@ typealias JSONDictionary = [String: Any]
 typealias JSONArray = [Any]
 
 enum SaveXKernelCompatibility {
-    static let ytDLPVersion = "2026.06.09"
+    static let kernelVersion = "2026.06.09"
     static let twitterAPIBase = URL(string: "https://api.x.com/1.1/")!
     static let twitterGraphQLAPIBase = URL(string: "https://x.com/i/api/graphql/")!
     static let twitterGraphQLEndpoint = "2ICDjqPd81tulZcYrtpTuQ/TweetResultByRestId"
-    static let twitterBearerToken = "AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA"
-    static let twitterLegacyBearerToken = "AAAAAAAAAAAAAAAAAAAAAIK1zgAAAAAA2tUWuhGZ2JceoId5GwYWU5GspY4%3DUq7gzFoCZs1QfwGoVdvSac3IniczZEYXIcDyumCauIXpcAPorE"
+    static let twitterBearerToken =
+        "AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA"
+    static let twitterLegacyBearerToken =
+        "AAAAAAAAAAAAAAAAAAAAAIK1zgAAAAAA2tUWuhGZ2JceoId5GwYWU5GspY4%3DUq7gzFoCZs1QfwGoVdvSac3IniczZEYXIcDyumCauIXpcAPorE"
 }
 
 enum TwitterAPISelection: String, CaseIterable, Sendable {
@@ -40,38 +42,38 @@ enum SaveXError: LocalizedError, Sendable {
 
     var errorDescription: String? {
         switch self {
-        case let .invalidURL(value):
+        case .invalidURL(let value):
             return "Invalid tweet URL: \(value)"
-        case let .unsupportedHost(host):
+        case .unsupportedHost(let host):
             return "Unsupported host: \(host)"
-        case let .tweetUnavailable(reason):
+        case .tweetUnavailable(let reason):
             return "Tweet unavailable: \(reason)"
-        case let .loginRequired(reason):
+        case .loginRequired(let reason):
             return "Login required: \(reason)"
-        case let .apiError(message, statusCode):
+        case .apiError(let message, let statusCode):
             if let statusCode {
                 return "Twitter API error (\(statusCode)): \(message)"
             }
             return "Twitter API error: \(message)"
-        case let .invalidResponse(reason):
+        case .invalidResponse(let reason):
             return "Invalid response: \(reason)"
         case .noVideoFound:
             return "No video could be found in this tweet"
         case .noFormatsFound:
             return "No downloadable formats were found"
-        case let .videoUnavailable(index):
+        case .videoUnavailable(let index):
             return "Video #\(index) is unavailable"
-        case let .mediaNotVideo(index):
+        case .mediaNotVideo(let index):
             return "Media #\(index) is not a video"
-        case let .unsupportedCard(name):
+        case .unsupportedCard(let name):
             return "Unsupported Twitter card: \(name)"
-        case let .unsupportedHLS(reason):
+        case .unsupportedHLS(let reason):
             return "Unsupported HLS playlist: \(reason)"
-        case let .hlsExportFailed(reason):
+        case .hlsExportFailed(let reason):
             return "HLS MP4 export failed: \(reason)"
-        case let .xmlParseFailed(reason):
+        case .xmlParseFailed(let reason):
             return "VMAP parse failed: \(reason)"
-        case let .notImplemented(reason):
+        case .notImplemented(let reason):
             return "Not implemented: \(reason)"
         case .photoLibraryAccessDenied:
             return "Photo library add access was denied"
@@ -181,11 +183,13 @@ func parseDimensions(from url: URL) -> (width: Int, height: Int)? {
     let pattern = #"/(\d+)x(\d+)/"#
     let source = url.absoluteString
     guard let expression = try? NSRegularExpression(pattern: pattern),
-          let match = expression.firstMatch(in: source, range: NSRange(source.startIndex..<source.endIndex, in: source)),
-          let widthRange = Range(match.range(at: 1), in: source),
-          let heightRange = Range(match.range(at: 2), in: source),
-          let width = Int(source[widthRange]),
-          let height = Int(source[heightRange]) else {
+        let match = expression.firstMatch(
+            in: source, range: NSRange(source.startIndex..<source.endIndex, in: source)),
+        let widthRange = Range(match.range(at: 1), in: source),
+        let heightRange = Range(match.range(at: 2), in: source),
+        let width = Int(source[widthRange]),
+        let height = Int(source[heightRange])
+    else {
         return nil
     }
     return (width, height)
@@ -194,8 +198,10 @@ func parseDimensions(from url: URL) -> (width: Int, height: Int)? {
 func mediaIDFromVariantURL(_ url: String) -> String? {
     let pattern = #"_video/(\d+)/"#
     guard let expression = try? NSRegularExpression(pattern: pattern),
-          let match = expression.firstMatch(in: url, range: NSRange(url.startIndex..<url.endIndex, in: url)),
-          let range = Range(match.range(at: 1), in: url) else {
+        let match = expression.firstMatch(
+            in: url, range: NSRange(url.startIndex..<url.endIndex, in: url)),
+        let range = Range(match.range(at: 1), in: url)
+    else {
         return nil
     }
     return String(url[range])

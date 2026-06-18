@@ -22,6 +22,8 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 18) {
                         header
 
+                        aboutPanel
+
                         preferencesPanel
 
                         GlassPanel {
@@ -180,6 +182,36 @@ struct SettingsView: View {
                     )
                 }
             }
+        }
+    }
+
+    private var aboutPanel: some View {
+        GlassPanel {
+            NavigationLink {
+                AboutView()
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "info.circle.fill")
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("About SaveX")
+                            .font(.subheadline.weight(.semibold))
+                        Text("Version and app information.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
         }
     }
 

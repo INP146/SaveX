@@ -38,6 +38,7 @@
 		A0010001000100010001001F /* DownloadCoreTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0010001000200010001001F /* DownloadCoreTypes.swift */; };
 		A00100010001000100010020 /* TwitterCookieStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010020 /* TwitterCookieStore.swift */; };
 		A00100010001000100010021 /* KeychainStringStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010021 /* KeychainStringStore.swift */; };
+		A00100010001000100010022 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010022 /* AboutView.swift */; };
 		A00100010001000100010040 /* savex.icon in Resources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010040 /* savex.icon */; };
 		B00100010001000100010001 /* SaveXKernelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00100010002000100010001 /* SaveXKernelTests.swift */; };
 /* End PBXBuildFile section */
@@ -85,6 +86,7 @@
 		A0010001000200010001001F /* DownloadCoreTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadCoreTypes.swift; sourceTree = "<group>"; };
 		A00100010002000100010020 /* TwitterCookieStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TwitterCookieStore.swift; sourceTree = "<group>"; };
 		A00100010002000100010021 /* KeychainStringStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStringStore.swift; sourceTree = "<group>"; };
+		A00100010002000100010022 /* AboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
 		A00100010002000100010040 /* savex.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = savex.icon; sourceTree = "<group>"; };
 		A00100010002000100010050 /* InfoPlistAdditions.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = InfoPlistAdditions.plist; sourceTree = "<group>"; };
 		B00100010002000100010001 /* SaveXKernelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveXKernelTests.swift; sourceTree = "<group>"; };
@@ -194,6 +196,7 @@
 			isa = PBXGroup;
 			children = (
 				A00100010002000100010009 /* SettingsView.swift */,
+				A00100010002000100010022 /* AboutView.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -515,6 +518,7 @@
 				A0010001000100010001000F /* SaveXKernelModels.swift in Sources */,
 				A00100010001000100010002 /* HomeView.swift in Sources */,
 				A0010001000100010001000B /* StatusPill.swift in Sources */,
+				A00100010001000100010022 /* AboutView.swift in Sources */,
 				A00100010001000100010006 /* JobsView.swift in Sources */,
 				A0010001000100010001000E /* SaveXSelectionKernel.swift in Sources */,
 				A00100010001000100010008 /* SettingsView.swift in Sources */,
@@ -610,8 +614,9 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = savex;
 				AdditionalContentFilePaths = "$(PROJECT_DIR)/SaveX/InfoPlistAdditions.plist";
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_ASSET_PATHS = "\"SaveX/Preview Content\"";
 				DEVELOPMENT_TEAM = 4KZR8B23CV;
 				ENABLE_PREVIEWS = YES;
@@ -630,9 +635,10 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.0.3;
+				MARKETING_VERSION = 0.0.4;
 				PRODUCT_BUNDLE_IDENTIFIER = io.github.inp146.savex;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -645,8 +651,9 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = savex;
 				AdditionalContentFilePaths = "$(PROJECT_DIR)/SaveX/InfoPlistAdditions.plist";
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_ASSET_PATHS = "\"SaveX/Preview Content\"";
 				DEVELOPMENT_TEAM = 4KZR8B23CV;
 				ENABLE_PREVIEWS = YES;
@@ -664,9 +671,10 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.0.3;
+				MARKETING_VERSION = 0.0.4;
 				PRODUCT_BUNDLE_IDENTIFIER = io.github.inp146.savex;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
