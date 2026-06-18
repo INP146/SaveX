@@ -1,10 +1,10 @@
 <div align="center">
 
-<img src="docs/design/composed/savex-iOS-Default-512x512@1x.png" alt="SaveX app icon" width="140" />
+<img src="docs/design/composed/savex-iOS-Default-512x512@1x.png" alt="SaveX app icon" width="120" />
 
 <h1 align="center">SaveX - Twitter Video Downloader</h1>
 
-<p><a href="README.md">🇺🇸 English</a></p>
+<p><a href="README.md">English</a> | <b>简体中文</b></p>
 
 <p>SaveX 是一个 iOS SwiftUI 应用，用来把公开 Twitter/X 帖子里的视频下载到本地，并尝试保存到系统相册。</p>
 
