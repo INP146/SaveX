@@ -4,6 +4,11 @@ import UIKit
 enum SaveXStorageKey {
     static let defaultDownloadRoute = "SaveX.defaultDownloadRoute"
     static let libraryLayout = "SaveX.libraryLayout"
+    static let theme = "SaveX.theme"
+    static let interfaceStyle = "SaveX.interfaceStyle"
+    static let customThemeAccent = "SaveX.customThemeAccent"
+    static let customThemeBackgroundAccent = "SaveX.customThemeBackgroundAccent"
+    static let customThemeBackgroundAccentSecondary = "SaveX.customThemeBackgroundAccentSecondary"
     static let savesDownloadsToLibrary = "SaveX.savesDownloadsToLibrary"
     static let savesDownloadsToPhotos = "SaveX.savesDownloadsToPhotos"
     static let downloadsAllTweetVideosByDefault = "SaveX.downloadsAllTweetVideosByDefault"

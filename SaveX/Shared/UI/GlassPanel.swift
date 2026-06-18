@@ -78,12 +78,7 @@ extension View {
     }
 
     func saveXGlassProminentIcon(diameter: CGFloat = SaveXGlassButtonMetrics.iconDiameter) -> some View {
-        font(.headline)
-            .foregroundStyle(.white)
-            .frame(width: diameter, height: diameter)
-            .background(Circle().fill(Color.accentColor))
-            .glassEffect(.regular.interactive(), in: Circle())
-            .contentShape(Circle())
+        modifier(SaveXGlassProminentIconStyle(diameter: diameter))
     }
 
     func saveXGlassIconButton() -> some View {
@@ -97,6 +92,21 @@ extension View {
 
     func saveXKeyboardDismissOverlay() -> some View {
         modifier(SaveXKeyboardDismissOverlay())
+    }
+}
+
+private struct SaveXGlassProminentIconStyle: ViewModifier {
+    let diameter: CGFloat
+    @Environment(\.saveXTheme) private var theme
+
+    func body(content: Content) -> some View {
+        content
+            .font(.headline)
+            .foregroundStyle(.white)
+            .frame(width: diameter, height: diameter)
+            .background(Circle().fill(theme.palette.accent))
+            .glassEffect(.regular.interactive(), in: Circle())
+            .contentShape(Circle())
     }
 }
 

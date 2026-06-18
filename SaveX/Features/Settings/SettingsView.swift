@@ -25,6 +25,8 @@ struct SettingsView: View {
 
                         aboutPanel
 
+                        appearancePanel
+
                         preferencesPanel
 
                         GlassPanel {
@@ -207,6 +209,36 @@ struct SettingsView: View {
                         Text("About SaveX")
                             .font(.subheadline.weight(.semibold))
                         Text("Version and app information.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var appearancePanel: some View {
+        GlassPanel {
+            NavigationLink {
+                AppearanceView()
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "paintpalette.fill")
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Appearance")
+                            .font(.subheadline.weight(.semibold))
+                        Text("Dark mode, theme, accent, and background colors.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }

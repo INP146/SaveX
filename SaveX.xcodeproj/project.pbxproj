@@ -39,6 +39,7 @@
 		A00100010001000100010020 /* TwitterCookieStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010020 /* TwitterCookieStore.swift */; };
 		A00100010001000100010021 /* KeychainStringStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010021 /* KeychainStringStore.swift */; };
 		A00100010001000100010022 /* AboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010022 /* AboutView.swift */; };
+		A00100010001000100010023 /* AppearanceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010023 /* AppearanceView.swift */; };
 		A00100010001000100010040 /* savex.icon in Resources */ = {isa = PBXBuildFile; fileRef = A00100010002000100010040 /* savex.icon */; };
 		B00100010001000100010001 /* SaveXKernelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00100010002000100010001 /* SaveXKernelTests.swift */; };
 /* End PBXBuildFile section */
@@ -87,6 +88,7 @@
 		A00100010002000100010020 /* TwitterCookieStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TwitterCookieStore.swift; sourceTree = "<group>"; };
 		A00100010002000100010021 /* KeychainStringStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStringStore.swift; sourceTree = "<group>"; };
 		A00100010002000100010022 /* AboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
+		A00100010002000100010023 /* AppearanceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceView.swift; sourceTree = "<group>"; };
 		A00100010002000100010040 /* savex.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = savex.icon; sourceTree = "<group>"; };
 		A00100010002000100010050 /* InfoPlistAdditions.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = InfoPlistAdditions.plist; sourceTree = "<group>"; };
 		B00100010002000100010001 /* SaveXKernelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveXKernelTests.swift; sourceTree = "<group>"; };
@@ -197,6 +199,7 @@
 			children = (
 				A00100010002000100010009 /* SettingsView.swift */,
 				A00100010002000100010022 /* AboutView.swift */,
+				A00100010002000100010023 /* AppearanceView.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -519,6 +522,7 @@
 				A00100010001000100010002 /* HomeView.swift in Sources */,
 				A0010001000100010001000B /* StatusPill.swift in Sources */,
 				A00100010001000100010022 /* AboutView.swift in Sources */,
+				A00100010001000100010023 /* AppearanceView.swift in Sources */,
 				A00100010001000100010006 /* JobsView.swift in Sources */,
 				A0010001000100010001000E /* SaveXSelectionKernel.swift in Sources */,
 				A00100010001000100010008 /* SettingsView.swift in Sources */,
