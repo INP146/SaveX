@@ -22,6 +22,24 @@
 
 </div>
 
+## 效果预览
+
+<p align="center">
+  <img src="docs/demo/01.png" alt="SaveX 预览图 1" width="260" />
+  <img src="docs/demo/02.png" alt="SaveX 预览图 2" width="260" />
+  <img src="docs/demo/03.png" alt="SaveX 预览图 3" width="260" />
+</p>
+
+<p align="center">
+  <img src="docs/demo/04.png" alt="SaveX 预览图 4" width="260" />
+  <img src="docs/demo/05.png" alt="SaveX 预览图 5" width="260" />
+  <img src="docs/demo/06.png" alt="SaveX 预览图 6" width="260" />
+</p>
+
+<p align="center">
+  <img src="docs/demo/07.png" alt="SaveX 预览图 7" width="260" />
+</p>
+
 ## 上游参考
 
 SaveX 的 Twitter/X 解析、格式提取和格式排序思路参考了 [yt-dlp](https://github.com/yt-dlp/yt-dlp) 项目。当前实现不是直接在 iOS 内运行 `yt-dlp`，而是基于相关下载链路，用 Swift 实现本地 iOS 下载内核。

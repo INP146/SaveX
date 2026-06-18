@@ -22,6 +22,24 @@
 
 </div>
 
+## Preview
+
+<p align="center">
+  <img src="docs/demo/01.png" alt="SaveX preview 1" width="260" />
+  <img src="docs/demo/02.png" alt="SaveX preview 2" width="260" />
+  <img src="docs/demo/03.png" alt="SaveX preview 3" width="260" />
+</p>
+
+<p align="center">
+  <img src="docs/demo/04.png" alt="SaveX preview 4" width="260" />
+  <img src="docs/demo/05.png" alt="SaveX preview 5" width="260" />
+  <img src="docs/demo/06.png" alt="SaveX preview 6" width="260" />
+</p>
+
+<p align="center">
+  <img src="docs/demo/07.png" alt="SaveX preview 7" width="260" />
+</p>
+
 ## Upstream Reference
 
 SaveX's Twitter/X parsing, format extraction, and format sorting logic are informed by the [yt-dlp](https://github.com/yt-dlp/yt-dlp) project. The current implementation does not run `yt-dlp` directly on iOS; instead, it reimplements the relevant download chain as a native Swift iOS download kernel.
