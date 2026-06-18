@@ -25,19 +25,13 @@
 ## 效果预览
 
 <p align="center">
-  <img src="docs/demo/01.png" alt="SaveX 预览图 1" width="260" />
-  <img src="docs/demo/02.png" alt="SaveX 预览图 2" width="260" />
-  <img src="docs/demo/03.png" alt="SaveX 预览图 3" width="260" />
+  <a href="docs/demo.md">
+    <img src="docs/demo/01.png" alt="SaveX 效果预览" width="280" />
+  </a>
 </p>
 
 <p align="center">
-  <img src="docs/demo/04.png" alt="SaveX 预览图 4" width="260" />
-  <img src="docs/demo/05.png" alt="SaveX 预览图 5" width="260" />
-  <img src="docs/demo/06.png" alt="SaveX 预览图 6" width="260" />
-</p>
-
-<p align="center">
-  <img src="docs/demo/07.png" alt="SaveX 预览图 7" width="260" />
+  <a href="docs/demo/demo.md"><b>查看全部截图</b></a>
 </p>
 
 ## 上游参考

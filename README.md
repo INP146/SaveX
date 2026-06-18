@@ -22,22 +22,14 @@
 
 </div>
 
-## Preview
-
 <p align="center">
-  <img src="docs/demo/01.png" alt="SaveX preview 1" width="260" />
-  <img src="docs/demo/02.png" alt="SaveX preview 2" width="260" />
-  <img src="docs/demo/03.png" alt="SaveX preview 3" width="260" />
+  <a href="docs/demo.md">
+    <img src="docs/demo/01.png" alt="SaveX preview" width="280" />
+  </a>
 </p>
 
 <p align="center">
-  <img src="docs/demo/04.png" alt="SaveX preview 4" width="260" />
-  <img src="docs/demo/05.png" alt="SaveX preview 5" width="260" />
-  <img src="docs/demo/06.png" alt="SaveX preview 6" width="260" />
-</p>
-
-<p align="center">
-  <img src="docs/demo/07.png" alt="SaveX preview 7" width="260" />
+  <a href="docs/demo/demo.md"><b>View all screenshots</b></a>
 </p>
 
 ## Upstream Reference
