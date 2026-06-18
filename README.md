@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/design/savex-iOS-Default-1024x1024@1x.png" alt="SaveX app icon" width="140" />
+<img src="docs/design/composed/savex-iOS-Default-1024x1024@1x.png" alt="SaveX app icon" width="140" />
 
 <h1 align="center">SaveX - Twitter Video Downloader</h1>
 
