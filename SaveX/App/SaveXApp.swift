@@ -6,6 +6,7 @@ enum SaveXStorageKey {
     static let libraryLayout = "SaveX.libraryLayout"
     static let savesDownloadsToLibrary = "SaveX.savesDownloadsToLibrary"
     static let savesDownloadsToPhotos = "SaveX.savesDownloadsToPhotos"
+    static let downloadsAllTweetVideosByDefault = "SaveX.downloadsAllTweetVideosByDefault"
 }
 
 final class SaveXAppDelegate: NSObject, UIApplicationDelegate {

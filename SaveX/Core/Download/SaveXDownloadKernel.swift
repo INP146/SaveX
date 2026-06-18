@@ -1,5 +1,14 @@
 import Foundation
 
+struct ResolvedDownload: Identifiable, Sendable {
+    let entry: TweetMediaInfo
+    let format: MediaFormat
+
+    var id: String {
+        entry.id
+    }
+}
+
 actor DownloadEngine {
     private let apiClient: TwitterAPIClient
     private let extractor: TwitterMediaExtractor
@@ -33,13 +42,15 @@ actor DownloadEngine {
         onProgressEvent: (@Sendable (DownloadProgressEvent) async -> Void)? = nil,
         onTraceEvent: (@Sendable (DownloadTraceEvent) async -> Void)? = nil
     ) async throws -> DownloadedAsset {
-        let (entry, format) = try await resolveEntryAndFormat(
+        let resolvedDownload = try await resolveEntryAndFormat(
             request: request,
             initialMode: mode,
             preference: preference,
             onProgressEvent: onProgressEvent,
             onTraceEvent: onTraceEvent
         )
+        let entry = resolvedDownload.entry
+        let format = resolvedDownload.format
 
         await onTraceEvent?(.init(kind: .info, message: "Planning \(format.formatID) using \(format.transport.rawValue)"))
         await onProgressEvent?(.init(
@@ -95,13 +106,13 @@ actor DownloadEngine {
         await hlsDownloader.cancelAndClean(jobID: jobID)
     }
 
-    private func resolveEntryAndFormat(
+    func resolveEntriesAndFormats(
         request: TweetRequest,
-        initialMode: TwitterAPISelection,
-        preference: FormatSelectionPreference,
-        onProgressEvent: (@Sendable (DownloadProgressEvent) async -> Void)?,
-        onTraceEvent: (@Sendable (DownloadTraceEvent) async -> Void)?
-    ) async throws -> (TweetMediaInfo, MediaFormat) {
+        initialMode: TwitterAPISelection = .graphql,
+        preference: FormatSelectionPreference = .ytDLPCompatible,
+        onProgressEvent: (@Sendable (DownloadProgressEvent) async -> Void)? = nil,
+        onTraceEvent: (@Sendable (DownloadTraceEvent) async -> Void)? = nil
+    ) async throws -> [ResolvedDownload] {
         var modes = [initialMode, TwitterAPISelection.legacy, .syndication]
         modes = modes.reduce(into: []) { result, mode in
             if !result.contains(mode) {
@@ -139,7 +150,7 @@ actor DownloadEngine {
                     }
                 )
 
-                guard let entry = entries.first else {
+                guard !entries.isEmpty else {
                     throw SaveXError.noVideoFound
                 }
 
@@ -150,15 +161,20 @@ actor DownloadEngine {
                     progress: 0.65,
                     message: "Selecting format"
                 ))
-                if let fallbackMessage = Self.formatPreferenceFallbackMessage(
-                    formats: entry.formats,
-                    preference: preference
-                ) {
-                    await onTraceEvent?(.init(kind: .warning, message: fallbackMessage))
+
+                var resolvedDownloads: [ResolvedDownload] = []
+                for entry in entries {
+                    if let fallbackMessage = Self.formatPreferenceFallbackMessage(
+                        formats: entry.formats,
+                        preference: preference
+                    ) {
+                        await onTraceEvent?(.init(kind: .warning, message: fallbackMessage))
+                    }
+                    let format = try selector.selectBest(from: entry.formats, preference: preference)
+                    await onTraceEvent?(.init(kind: .success, message: "Selected format \(format.formatID) for \(entry.displayID)"))
+                    resolvedDownloads.append(ResolvedDownload(entry: entry, format: format))
                 }
-                let format = try selector.selectBest(from: entry.formats, preference: preference)
-                await onTraceEvent?(.init(kind: .success, message: "Selected format \(format.formatID)"))
-                return (entry, format)
+                return resolvedDownloads
             } catch {
                 guard Self.shouldTryNextMode(
                     after: error,
@@ -175,6 +191,25 @@ actor DownloadEngine {
 
         await onTraceEvent?(.init(kind: .error, message: "All tweet sources failed"))
         throw recoverableError ?? SaveXError.noVideoFound
+    }
+
+    private func resolveEntryAndFormat(
+        request: TweetRequest,
+        initialMode: TwitterAPISelection,
+        preference: FormatSelectionPreference,
+        onProgressEvent: (@Sendable (DownloadProgressEvent) async -> Void)?,
+        onTraceEvent: (@Sendable (DownloadTraceEvent) async -> Void)?
+    ) async throws -> ResolvedDownload {
+        guard let resolvedDownload = try await resolveEntriesAndFormats(
+            request: request,
+            initialMode: initialMode,
+            preference: preference,
+            onProgressEvent: onProgressEvent,
+            onTraceEvent: onTraceEvent
+        ).first else {
+            throw SaveXError.noVideoFound
+        }
+        return resolvedDownload
     }
 
     private static func formatPreferenceFallbackMessage(

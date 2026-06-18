@@ -9,6 +9,7 @@ struct SettingsView: View {
         .rawValue
     @AppStorage(SaveXStorageKey.savesDownloadsToLibrary) private var savesDownloadsToLibrary = true
     @AppStorage(SaveXStorageKey.savesDownloadsToPhotos) private var savesDownloadsToPhotos = true
+    @AppStorage(SaveXStorageKey.downloadsAllTweetVideosByDefault) private var downloadsAllTweetVideosByDefault = false
     @State private var cookieDraft = ""
     @State private var cookieValidationMessage = ""
     @State private var showsCookieValidationAlert = false
@@ -161,6 +162,13 @@ struct SettingsView: View {
                     Text(defaultRoute.helpText)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+
+                    preferenceToggle(
+                        title: "Download all tweet videos",
+                        subtitle: "When a tweet has multiple videos, queue every video instead of asking.",
+                        systemImage: "square.stack.3d.down.right.fill",
+                        isOn: $downloadsAllTweetVideosByDefault
+                    )
                 }
 
                 Divider()

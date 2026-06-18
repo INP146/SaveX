@@ -131,6 +131,7 @@ struct DownloadJobStore {
 private struct DownloadStoragePreferences {
     let savesToLibrary: Bool
     let savesToPhotos: Bool
+    let downloadsAllTweetVideosByDefault: Bool
 
     static func current(userDefaults: UserDefaults) -> DownloadStoragePreferences {
         var savesToLibrary = bool(
@@ -143,6 +144,11 @@ private struct DownloadStoragePreferences {
             defaultValue: true,
             userDefaults: userDefaults
         )
+        let downloadsAllTweetVideosByDefault = bool(
+            forKey: SaveXStorageKey.downloadsAllTweetVideosByDefault,
+            defaultValue: false,
+            userDefaults: userDefaults
+        )
 
         if !savesToLibrary && !savesToPhotos {
             savesToLibrary = true
@@ -150,7 +156,8 @@ private struct DownloadStoragePreferences {
 
         return DownloadStoragePreferences(
             savesToLibrary: savesToLibrary,
-            savesToPhotos: savesToPhotos
+            savesToPhotos: savesToPhotos,
+            downloadsAllTweetVideosByDefault: downloadsAllTweetVideosByDefault
         )
     }
 
@@ -172,12 +179,33 @@ private struct LibraryStorageOutcome {
     let errorMessage: String?
 }
 
+struct TwitterMediaSelection: Identifiable, Sendable {
+    let id: UUID
+    let request: TweetRequest
+    let preference: FormatSelectionPreference
+    let candidates: [ResolvedDownload]
+
+    init(
+        id: UUID = UUID(),
+        request: TweetRequest,
+        preference: FormatSelectionPreference,
+        candidates: [ResolvedDownload]
+    ) {
+        self.id = id
+        self.request = request
+        self.preference = preference
+        self.candidates = candidates
+    }
+}
+
 @MainActor
 final class DownloadCenter: ObservableObject {
     @Published private(set) var jobs: [DownloadJob]
     @Published private(set) var banner: DownloadBanner
     @Published private(set) var logs: [DownloadLogEntry]
     @Published private(set) var libraryItems: [LocalLibraryItem]
+    @Published private(set) var isResolvingMediaSelection: Bool
+    @Published var pendingTwitterMediaSelection: TwitterMediaSelection?
 
     private let container: AppContainer
     private let fileManager: FileManager
@@ -213,6 +241,8 @@ final class DownloadCenter: ObservableObject {
         self.jobStore = jobStore
         self.shouldPersistJobs = loadPersistedJobs
         self.jobPreferences = Dictionary(uniqueKeysWithValues: restoredRecords.map { ($0.job.id, $0.preference) })
+        self.isResolvingMediaSelection = false
+        self.pendingTwitterMediaSelection = nil
         self.libraryItems = loadPersistedLibrary
             ? Self.loadLibraryItems(fileManager: fileManager)
             : libraryItems
@@ -519,33 +549,160 @@ final class DownloadCenter: ObservableObject {
             return false
         }
 
+        guard !isResolvingMediaSelection else {
+            banner = DownloadBanner(text: "Still checking tweet media…", kind: .info)
+            return false
+        }
+
         do {
             let request = try container.urlParser.parse(trimmed)
-            let job = DownloadJob(
-                request: request,
-                phase: .queued,
-                progress: 0.08,
-                displayTitle: "Tweet \(request.tweetID)"
-            )
-            jobs.insert(job, at: 0)
-            jobPreferences[job.id] = preference
-            persistJob(job)
-            banner = DownloadBanner(text: "Queued tweet \(request.tweetID)", kind: .info)
+            isResolvingMediaSelection = true
+            banner = DownloadBanner(text: "Checking tweet media…", kind: .info)
             appendLog(
                 kind: .info,
-                title: "Queued",
+                title: "Resolving media",
                 message: "Preference: \(preference.logLabel). URL parsed successfully.",
-                jobID: job.id,
                 tweetID: request.tweetID
             )
 
-            startDownloadTask(jobID: job.id, request: request, preference: preference)
+            Task { @MainActor [weak self] in
+                await self?.resolveAndQueue(request: request, preference: preference)
+            }
             return true
         } catch {
             banner = DownloadBanner(text: error.localizedDescription, kind: .error)
             appendLog(kind: .error, title: "URL parse failed", message: error.localizedDescription, tweetID: nil)
             return false
         }
+    }
+
+    func confirmTwitterMediaSelection(candidate: ResolvedDownload) {
+        guard let selection = pendingTwitterMediaSelection else {
+            return
+        }
+        pendingTwitterMediaSelection = nil
+        queueResolvedDownload(candidate, request: selection.request, preference: selection.preference)
+        banner = DownloadBanner(text: "Queued selected video", kind: .info)
+    }
+
+    func confirmAllTwitterMediaSelection() {
+        guard let selection = pendingTwitterMediaSelection else {
+            return
+        }
+        pendingTwitterMediaSelection = nil
+        queueResolvedDownloads(selection.candidates, request: selection.request, preference: selection.preference)
+    }
+
+    func cancelTwitterMediaSelection() {
+        guard pendingTwitterMediaSelection != nil else {
+            return
+        }
+        pendingTwitterMediaSelection = nil
+        banner = DownloadBanner(text: "Download cancelled", kind: .info)
+    }
+
+    private func resolveAndQueue(
+        request: TweetRequest,
+        preference: FormatSelectionPreference
+    ) async {
+        do {
+            let resolvedDownloads = try await container.downloadEngine.resolveEntriesAndFormats(
+                request: request,
+                preference: preference,
+                onTraceEvent: { [weak self] event in
+                    await self?.appendLog(
+                        kind: DownloadLogEntry.Kind(event.kind),
+                        title: event.kind.title,
+                        message: event.message,
+                        tweetID: request.tweetID
+                    )
+                }
+            )
+
+            guard resolvedDownloads.count > 1, request.selectedMediaIndex == nil else {
+                isResolvingMediaSelection = false
+                queueResolvedDownloads(resolvedDownloads, request: request, preference: preference)
+                return
+            }
+
+            if storagePreferences.downloadsAllTweetVideosByDefault {
+                isResolvingMediaSelection = false
+                queueResolvedDownloads(resolvedDownloads, request: request, preference: preference)
+            } else {
+                pendingTwitterMediaSelection = TwitterMediaSelection(
+                    request: request,
+                    preference: preference,
+                    candidates: resolvedDownloads
+                )
+                isResolvingMediaSelection = false
+                banner = DownloadBanner(text: "Choose which video to queue", kind: .info)
+            }
+        } catch {
+            isResolvingMediaSelection = false
+            banner = DownloadBanner(text: error.localizedDescription, kind: .error)
+            appendLog(kind: .error, title: "Media resolution failed", message: error.localizedDescription, tweetID: request.tweetID)
+        }
+    }
+
+    private func queueResolvedDownloads(
+        _ resolvedDownloads: [ResolvedDownload],
+        request: TweetRequest,
+        preference: FormatSelectionPreference
+    ) {
+        for resolvedDownload in resolvedDownloads {
+            queueResolvedDownload(resolvedDownload, request: request, preference: preference)
+        }
+
+        if resolvedDownloads.count == 1 {
+            banner = DownloadBanner(text: "Queued tweet \(request.tweetID)", kind: .info)
+        } else {
+            banner = DownloadBanner(text: "Queued \(resolvedDownloads.count) videos", kind: .info)
+        }
+    }
+
+    private func queueResolvedDownload(
+        _ resolvedDownload: ResolvedDownload,
+        request: TweetRequest,
+        preference: FormatSelectionPreference
+    ) {
+        let jobRequest = requestForDownload(resolvedDownload, request: request)
+        let job = DownloadJob(
+            request: jobRequest,
+            phase: .queued,
+            progress: 0.08,
+            displayTitle: resolvedDownload.entry.title,
+            selectedFormatID: resolvedDownload.format.formatID
+        )
+        jobs.insert(job, at: 0)
+        jobPreferences[job.id] = preference
+        persistJob(job)
+        appendLog(
+            kind: .info,
+            title: "Queued",
+            message: "Preference: \(preference.logLabel). Media \(resolvedDownload.entry.sourceMediaIndex ?? 1) selected.",
+            jobID: job.id,
+            tweetID: jobRequest.tweetID
+        )
+
+        startDownloadTask(jobID: job.id, request: jobRequest, preference: preference)
+    }
+
+    private func requestForDownload(
+        _ resolvedDownload: ResolvedDownload,
+        request: TweetRequest
+    ) -> TweetRequest {
+        guard let sourceMediaIndex = resolvedDownload.entry.sourceMediaIndex,
+              request.selectedMediaIndex == nil else {
+            return request
+        }
+
+        return TweetRequest(
+            sourceURL: request.sourceURL,
+            tweetID: request.tweetID,
+            screenName: request.screenName,
+            selectedMediaIndex: sourceMediaIndex,
+            selectedMediaKind: .video
+        )
     }
 
     private func startDownloadTask(
