@@ -34,9 +34,11 @@ For a deeper walkthrough, see [yt-dlp Twitter/X download chain](docs/agent/yt-dl
 - Fetches Tweet data through Twitter/X GraphQL, legacy API, and syndication fallback paths
 - Supports optional Twitter/X Cookie header storage in Keychain for content available to that session
 - Extracts video format candidates from Tweet media variants and card data
+- Supports choosing one video or queueing all videos from multi-video Tweets, with an option to download all Tweet videos by default
 - Supports direct MP4 downloads and basic HLS VOD downloads
 - Supports resumable/background MP4 downloads, pause/resume, retry, and launch recovery for persisted jobs
 - Includes Jobs, Logs, Library, and Settings views
+- Supports appearance customization, including interface style, preset themes, and custom theme colors
 - Provides a local Library with playback, detail views, sharing, deletion, generated covers, and multiple layouts
 - Attempts to save completed downloads to Photos
 - Keeps local library records, so downloaded files remain visible in the app even if saving to Photos fails

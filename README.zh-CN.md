@@ -34,9 +34,11 @@ SaveX 的 Twitter/X 解析、格式提取和格式排序思路参考了 [yt-dlp]
 - 通过 Twitter/X GraphQL、legacy API 和 syndication fallback 获取 Tweet 数据
 - 支持把可选的 Twitter/X Cookie Header 存入 Keychain，用于访问当前会话可见的内容
 - 从 Tweet media variants 和 card 数据中提取视频候选格式
+- 支持多视频 Tweet 的单个选择或全部排队下载，并可设置默认下载全部视频
 - 支持 MP4 直链下载和基础 HLS VOD 下载
 - 支持可恢复/后台 MP4 下载、暂停/继续、重试，以及启动后恢复持久化任务状态
 - 支持任务列表、下载日志、本地媒体库和设置页面
+- 支持外观设置，包括界面样式、预设主题和自定义主题色
 - 本地媒体库支持播放、详情页、分享、删除、封面生成和多种布局
 - 下载完成后尝试写入 Photos
 - 保留本地媒体库记录，Photos 保存失败时也能在应用内查看已下载文件
